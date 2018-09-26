@@ -341,13 +341,13 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
                     param.vendorExtensions.put("x-parameterType", typeHint);
                 }
 
-                if (param.isContainer) {
+                if (param.isListContainer) {
                     param.vendorExtensions.put("x-parameterType", getTypeHint(param.dataType+"[]"));
                 }
 
                 // Create a variable to display the correct data type in comments for interfaces
                 param.vendorExtensions.put("x-commentType", param.dataType);
-                if (param.isContainer) {
+                if (param.isListContainer) {
                     param.vendorExtensions.put("x-commentType", param.dataType+"[]");
                 }
 
