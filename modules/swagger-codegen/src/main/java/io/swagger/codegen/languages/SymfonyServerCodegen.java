@@ -368,7 +368,7 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
             // Create a variable to display the correct return type in comments for interfaces
             if (op.returnType != null) {
                 op.vendorExtensions.put("x-commentType", op.returnType);
-                if (!op.returnTypeIsPrimitive) {
+                if (op.isListContainer) {
                     op.vendorExtensions.put("x-commentType", op.returnType+"[]");
                 }
             } else {
