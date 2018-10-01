@@ -38,6 +38,7 @@ class Controller extends BaseController
     protected $validator;
     protected $serializer;
     protected $apiServer;
+    protected $logger;
 
     public function setValidator(ValidatorInterface $validator)
     {
@@ -52,6 +53,11 @@ class Controller extends BaseController
     public function setApiServer($server)
     {
         $this->apiServer = $server;
+    }
+
+    public function setLogger(LoggerInterface $logger)
+    {
+        $this->logger = $logger;
     }
 
     /**

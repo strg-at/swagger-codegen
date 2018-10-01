@@ -25,6 +25,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Validator\Constraints as Assert;
 use {{apiPackage}}\{{classname}};
+use Psr\Log\LoggerInterface;
 {{#imports}}use {{import}};
 {{/imports}}
 
@@ -161,6 +162,14 @@ class {{controllerName}} extends Controller
             $responseHeaders = [];
             $result = $handler->{{operationId}}({{#allParams}}${{paramName}}, {{/allParams}}$responseCode, $responseHeaders);
 
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type("{{vendorExtensions.x-commentType}}");
+            $errors = $this->validator->validate($result, $asserts);
+            if (count($errors)) {
+                $this->logger->error((string)$errors);
+                return $this->createErrorResponse(new HttpException(500, 'The api did not return valid data: ' . (string)$errors));
+            }
             // Find default response message
             $message = '{{#responses}}{{#isDefault}}{{message}}{{/isDefault}}{{/responses}}';
 
