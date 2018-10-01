@@ -151,6 +151,13 @@ class Controller
 
     protected function getOutputFormat($accept, array $produced)
     {
+        $produced = array_map(function ($value) {
+            if (strpos($value, ';') === false) {
+                return $value;
+            }
+            $splitValue = explode(';', $value);
+            return array_shift($splitValue);
+        }, $produced);
         // Figure out what the client accepts
         $accept = preg_split("/[\s,;]+/", $accept);
         
