@@ -20,7 +20,7 @@ public class CodegenOperation {
             isRestful, isDeprecated;
     public String path, operationId, returnType, httpMethod, returnBaseType,
             returnContainer, summary, unescapedNotes, notes, baseName, defaultResponse, discriminator;
-    public List<Map<String, String>> consumes, produces, prioritizedContentTypes;
+    public List<Map<String, String>> consumes, produces, prioritizedContentTypes, allReturnTypes;
     public CodegenParameter bodyParam;
     public List<CodegenParameter> allParams = new ArrayList<CodegenParameter>();
     public List<CodegenParameter> bodyParams = new ArrayList<CodegenParameter>();

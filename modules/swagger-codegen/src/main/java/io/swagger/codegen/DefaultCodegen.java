@@ -2021,6 +2021,7 @@ public class DefaultCodegen {
                                           Swagger swagger) {
         CodegenOperation op = CodegenModelFactory.newInstance(CodegenModelType.OPERATION);
         Set<String> imports = new HashSet<String>();
+        Set<String> allReturnTypes = new HashSet<String>();
         op.vendorExtensions = operation.getVendorExtensions();
 
         String operationId = getOrGenerateOperationId(operation, path, httpMethod);
@@ -2130,6 +2131,7 @@ public class DefaultCodegen {
                         !defaultIncludes.contains(r.baseType) &&
                         !languageSpecificPrimitives.contains(r.baseType)) {
                     imports.add(r.baseType);
+                    allReturnTypes.add(r.dataType);
                 }
                 r.isDefault = response == methodResponse;
                 op.responses.add(r);
@@ -2263,6 +2265,21 @@ public class DefaultCodegen {
                 op.imports.add(i);
             }
         }
+        List<Map<String, String>> returnTypesList = new ArrayList<Map<String, String>>();
+        int count = 0;
+        for (String i : allReturnTypes) {
+            Map<String, String> returnType = new HashMap<String, String>();
+            returnType.put("returnType", i);
+            count += 1;
+            if (count < allReturnTypes.size()) {
+                returnType.put("hasMore", "true");
+            } else {
+                returnType.put("hasMore", null);
+            }
+            returnTypesList.add(returnType);
+        }
+
+        op.allReturnTypes = returnTypesList;
 
         op.bodyParam = bodyParam;
         op.httpMethod = httpMethod.toUpperCase();
