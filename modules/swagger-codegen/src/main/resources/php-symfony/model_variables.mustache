@@ -3,7 +3,7 @@
      * {{description}}
      *
     {{/description}}
-     * @var {{{vendorExtensions.x-commentType}}}{{^required}}|null{{/required}}
+     * @var {{^isPrimitiveType}}\{{/isPrimitiveType}}{{{vendorExtensions.x-commentType}}}{{^required}}|null{{/required}}
      * @SerializedName("{{baseName}}")
 {{#required}}
      * @Assert\NotNull()
