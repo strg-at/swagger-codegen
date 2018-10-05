@@ -59,8 +59,12 @@ class {{controllerName}} extends Controller
     {
         {{#bodyParams}}
         // Make sure that the client is providing something that we can consume
-        $consumes = [{{#consumes}}'{{{mediaType}}}'{{#hasMore}}, {{/hasMore}}{{/consumes}}];
-        $inputFormat = $request->headers->has('Content-Type')?$request->headers->get('Content-Type'):$consumes[0];
+        $consumes = [
+            {{#consumes}}
+            '{{{mediaType}}}',
+            {{/consumes}}
+        ];
+        $inputFormat = $request->headers->has('Content-Type') ? $request->headers->get('Content-Type') : $consumes[0];
         if (!in_array($inputFormat, $consumes)) {
             // We can't consume the content that the client is sending us
             return new Response('', 415);
@@ -152,6 +156,14 @@ class {{controllerName}} extends Controller
         try {
             $handler = $this->getApiHandler();
 
+            // Know responsecodes and appropiate model and message
+            $responses = [
+                {{#responses}}{{code}} => [
+                    'message' => '{{message}}',
+                    'responseType' => '{{dataType}}',
+                ],{{/responses}}
+            ];
+
             {{#authMethods}}
             // Set authentication method '{{name}}'
             $handler->set{{name}}($security{{name}});
@@ -162,24 +174,17 @@ class {{controllerName}} extends Controller
             $responseHeaders = [];
             $result = $handler->{{operationId}}({{#allParams}}${{paramName}}, {{/allParams}}$responseCode, $responseHeaders);
 
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
+            $message = $responses[$responseCode]['message'];
+
             // Assert that the output from business logic corresponds to response model
             $asserts = [];
-            $asserts[] = new Assert\Type("{{vendorExtensions.x-commentType}}");
+            $asserts[] = new Assert\Type($responseType);
             $errors = $this->validator->validate($result, $asserts);
             if (count($errors)) {
                 $this->logger->error((string)$errors);
                 return $this->createErrorResponse(new HttpException(500, 'The api did not return valid data: ' . (string)$errors));
-            }
-            // Find default response message
-            $message = '{{#responses}}{{#isDefault}}{{message}}{{/isDefault}}{{/responses}}';
-
-            // Find a more specific message, if available
-            switch ($responseCode) {
-            {{#responses}}
-                case {{code}}:
-                    $message = '{{message}}';
-                    break;
-            {{/responses}}
             }
 
             return new Response(
