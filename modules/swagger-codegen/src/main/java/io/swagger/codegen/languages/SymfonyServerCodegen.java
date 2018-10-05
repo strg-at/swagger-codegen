@@ -399,7 +399,7 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
             if (var.datatype != null) {
                 // Determine if the parameter type is supported as a type hint and make it available
                 // to the templating engine
-                String typeHint = getTypeHint(var.datatype);
+                String typeHint = getTypeHint(var.baseType);
                 if (!typeHint.isEmpty()) {
                     var.vendorExtensions.put("x-parameterType", typeHint);
                 }
