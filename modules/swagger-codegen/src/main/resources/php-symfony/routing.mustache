@@ -27,7 +27,7 @@
         {{paramName}}: '\d+'
         {{/isInteger}}
         {{#isString}}
-        {{paramName}}: '[a-z0-9]+'
+        {{paramName}}: '[A-Za-z0-9-]+'
         {{/isString}}
         {{#isBoolean}}
         {{paramName}}: 'true|false'
