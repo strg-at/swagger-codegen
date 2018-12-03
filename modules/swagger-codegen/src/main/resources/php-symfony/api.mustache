@@ -65,7 +65,7 @@ interface {{classname}}
      * @return {{#allReturnTypes}}\{{{returnType}}}{{#hasMore}}|{{/hasMore}}{{/allReturnTypes}}
      *
      */
-    public function {{operationId}}({{#allParams}}{{#vendorExtensions.x-parameterType}}{{vendorExtensions.x-parameterType}} {{/vendorExtensions.x-parameterType}}${{paramName}}{{^required}} = {{#defaultValue}}{{{.}}}{{/defaultValue}}{{^defaultValue}}null{{/defaultValue}}{{/required}}, {{/allParams}}&$responseCode, array &$responseHeaders);
+    public function {{operationId}}({{#allParams}}{{#vendorExtensions.x-parameterType}}{{vendorExtensions.x-parameterType}} {{/vendorExtensions.x-parameterType}}${{paramName}}{{^required}} = {{#defaultValue}}{{{.}}}{{/defaultValue}}{{^defaultValue}}null{{/defaultValue}}{{/required}}, {{/allParams}}&$responseCode = 200, array &$responseHeaders = []);
 {{/operation}}
 }
 {{/operations}}
