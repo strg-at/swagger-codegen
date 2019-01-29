@@ -20,6 +20,7 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
     public static final String COMPOSER_VENDOR_NAME = "composerVendorName";
     public static final String COMPOSER_PROJECT_NAME = "composerProjectName";
     public static final String PHP_LEGACY_SUPPORT = "phpLegacySupport";
+    public static final String SYMFONY_LEGACY_SUPPORT = "symfonyLegacySupport";
     public static final Map<String, String> SYMFONY_EXCEPTIONS;
     protected String testsPackage;
     protected String apiTestsPackage;
@@ -35,7 +36,8 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
     protected String serviceDirName = "Service";
     protected String controllerPackage;
     protected String servicePackage;
-    protected Boolean phpLegacySupport = Boolean.TRUE;
+    protected Boolean phpLegacySupport = Boolean.FALSE;
+    protected Boolean symfonyLegacySupport = Boolean.FALSE;
 
     protected HashSet<String> typeHintable;
 
@@ -82,44 +84,44 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
         embeddedTemplateDir = templateDir = "php-symfony";
 
         setReservedWordsLowerCase(
-            Arrays.asList(
-                // local variables used in api methods (endpoints)
-                "resourcePath", "httpBody", "queryParams", "headerParams",
-                "formParams", "_header_accept", "_tempBody",
+                Arrays.asList(
+                        // local variables used in api methods (endpoints)
+                        "resourcePath", "httpBody", "queryParams", "headerParams",
+                        "formParams", "_header_accept", "_tempBody",
 
-                // PHP reserved words
-                "__halt_compiler", "abstract", "and", "array", "as", "break", "callable", "case", "catch", "class", "clone", "const", "continue", "declare", "default", "die", "do", "echo", "else", "elseif", "empty", "enddeclare", "endfor", "endforeach", "endif", "endswitch", "endwhile", "eval", "exit", "extends", "final", "for", "foreach", "function", "global", "goto", "if", "implements", "include", "include_once", "instanceof", "insteadof", "interface", "isset", "list", "namespace", "new", "or", "print", "private", "protected", "public", "require", "require_once", "return", "static", "switch", "throw", "trait", "try", "unset", "use", "var", "while", "xor"
-            )
+                        // PHP reserved words
+                        "__halt_compiler", "abstract", "and", "array", "as", "break", "callable", "case", "catch", "class", "clone", "const", "continue", "declare", "default", "die", "do", "echo", "else", "elseif", "empty", "enddeclare", "endfor", "endforeach", "endif", "endswitch", "endwhile", "eval", "exit", "extends", "final", "for", "foreach", "function", "global", "goto", "if", "implements", "include", "include_once", "instanceof", "insteadof", "interface", "isset", "list", "namespace", "new", "or", "print", "private", "protected", "public", "require", "require_once", "return", "static", "switch", "throw", "trait", "try", "unset", "use", "var", "while", "xor"
+                )
         );
 
         // ref: http://php.net/manual/en/language.types.intro.php
         languageSpecificPrimitives = new HashSet<String>(
-            Arrays.asList(
-                "bool",
-                "int",
-                "double",
-                "float",
-                "string",
-                "object",
-                "mixed",
-                "number",
-                "void",
-                "byte",
-                "array"
-            )
+                Arrays.asList(
+                        "bool",
+                        "int",
+                        "double",
+                        "float",
+                        "string",
+                        "object",
+                        "mixed",
+                        "number",
+                        "void",
+                        "byte",
+                        "array"
+                )
         );
 
         defaultIncludes = new HashSet<String>(
-            Arrays.asList(
-                "\\DateTime",
-                "UploadedFile"
-            )
+                Arrays.asList(
+                        "\\DateTime",
+                        "UploadedFile"
+                )
         );
 
         variableNamingConvention = "camelCase";
 
         // provide primitives to mustache template
-        List sortedLanguageSpecificPrimitives= new ArrayList(languageSpecificPrimitives);
+        List sortedLanguageSpecificPrimitives = new ArrayList(languageSpecificPrimitives);
         Collections.sort(sortedLanguageSpecificPrimitives);
         String primitives = "'" + StringUtils.join(sortedLanguageSpecificPrimitives, "', '") + "'";
         additionalProperties.put("primitives", primitives);
@@ -150,7 +152,8 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
         cliOptions.add(new CliOption(COMPOSER_PROJECT_NAME, "The project name used in the composer package name. The template uses {{composerVendorName}}/{{composerProjectName}} for the composer package name. e.g. petstore-client. IMPORTANT NOTE (2016/03): composerProjectName will be deprecated and replaced by gitRepoId in the next swagger-codegen release"));
         cliOptions.add(new CliOption(CodegenConstants.HIDE_GENERATION_TIMESTAMP, "hides the timestamp when files were generated")
                 .defaultValue(Boolean.TRUE.toString()));
-        cliOptions.add(new CliOption(PHP_LEGACY_SUPPORT, "Should the generated code be compatible with PHP 5.x?").defaultValue(Boolean.TRUE.toString()));
+        cliOptions.add(new CliOption(PHP_LEGACY_SUPPORT, "Should the generated code be compatible with PHP 5.x?").defaultValue(Boolean.FALSE.toString()));
+        cliOptions.add(new CliOption(SYMFONY_LEGACY_SUPPORT, "Should the generated code be compatible with Symfony 3.x?").defaultValue(Boolean.FALSE.toString()));
     }
 
     public String getBundleName() {
@@ -166,6 +169,10 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
 
     public void setPhpLegacySupport(Boolean support) {
         this.phpLegacySupport = support;
+    }
+
+    public void setSymfonyLegacySupport(Boolean support) {
+        this.symfonyLegacySupport = support;
     }
 
     public String controllerFileFolder() {
@@ -208,7 +215,6 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
     @Override
     public void processOpts() {
         super.processOpts();
-
         // default HIDE_GENERATION_TIMESTAMP to true
         if (!additionalProperties.containsKey(CodegenConstants.HIDE_GENERATION_TIMESTAMP)) {
             additionalProperties.put(CodegenConstants.HIDE_GENERATION_TIMESTAMP, Boolean.TRUE.toString());
@@ -234,11 +240,23 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
         } else {
             additionalProperties.put(COMPOSER_VENDOR_NAME, composerVendorName);
         }
-
         if (additionalProperties.containsKey(PHP_LEGACY_SUPPORT)) {
             this.setPhpLegacySupport(Boolean.valueOf((String) additionalProperties.get(PHP_LEGACY_SUPPORT)));
         } else {
             additionalProperties.put(PHP_LEGACY_SUPPORT, phpLegacySupport);
+        }
+
+        if (additionalProperties.containsKey(SYMFONY_LEGACY_SUPPORT)) {
+            this.setSymfonyLegacySupport(Boolean.valueOf((String) additionalProperties.get(SYMFONY_LEGACY_SUPPORT)));
+        } else {
+            additionalProperties.put(SYMFONY_LEGACY_SUPPORT, symfonyLegacySupport);
+        }
+        // legacy flags available in a form that mustache can use
+        if (symfonyLegacySupport) {
+            additionalProperties.put("supportLegacySymfony", "1");
+        }
+        if (phpLegacySupport) {
+            additionalProperties.put("supportLegacyPhp", "1");
         }
 
         additionalProperties.put("escapedInvokerPackage", invokerPackage.replace("\\", "\\\\"));
@@ -298,7 +316,7 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
         supportingFiles.add(new SupportingFile("composer.mustache", getPackagePath(), "composer.json"));
         supportingFiles.add(new SupportingFile("autoload.mustache", getPackagePath(), "autoload.php"));
         supportingFiles.add(new SupportingFile("README.mustache", getPackagePath(), "README.md"));
-        
+
         supportingFiles.add(new SupportingFile(".travis.yml", getPackagePath(), ".travis.yml"));
         supportingFiles.add(new SupportingFile(".php_cs", getPackagePath(), ".php_cs"));
         supportingFiles.add(new SupportingFile("git_push.sh.mustache", getPackagePath(), "git_push.sh"));
@@ -307,19 +325,19 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
         // ref: http://php.net/manual/en/functions.arguments.php#functions.arguments.type-declaration
         if (phpLegacySupport) {
             typeHintable = new HashSet<String>(
-                Arrays.asList(
-                    "array"
-                )
+                    Arrays.asList(
+                            "array"
+                    )
             );
         } else {
             typeHintable = new HashSet<String>(
-                Arrays.asList(
-                    "array",
-                    "bool",
-                    "float",
-                    "int",
-                    "string"
-                )
+                    Arrays.asList(
+                            "array",
+                            "bool",
+                            "float",
+                            "int",
+                            "string"
+                    )
             );
         }
     }
@@ -347,13 +365,13 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
                 }
 
                 if (param.isListContainer) {
-                    param.vendorExtensions.put("x-parameterType", getTypeHint(param.dataType+"[]"));
+                    param.vendorExtensions.put("x-parameterType", getTypeHint(param.dataType + "[]"));
                 }
 
                 // Create a variable to display the correct data type in comments for interfaces
                 param.vendorExtensions.put("x-commentType", param.dataType);
                 if (param.isListContainer) {
-                    param.vendorExtensions.put("x-commentType", param.dataType+"[]");
+                    param.vendorExtensions.put("x-commentType", param.dataType + "[]");
                 }
 
                 // Quote default values for strings
@@ -361,7 +379,7 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
                 //        in DefaultCodegen fromParameter with no real possibility to override
                 //        the functionality. Thus we are handling quoting of string values here
                 if (param.dataType.equals("string") && param.defaultValue != null && !param.defaultValue.isEmpty()) {
-                    param.defaultValue = "'"+param.defaultValue+"'";
+                    param.defaultValue = "'" + param.defaultValue + "'";
                 }
             }
 
@@ -369,7 +387,7 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
             if (op.returnType != null) {
                 op.vendorExtensions.put("x-commentType", op.returnType);
                 if (op.isListContainer) {
-                    op.vendorExtensions.put("x-commentType", op.returnType+"[]");
+                    op.vendorExtensions.put("x-commentType", op.returnType + "[]");
                 }
             } else {
                 op.vendorExtensions.put("x-commentType", "void");
@@ -407,7 +425,7 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
                 // Create a variable to display the correct data type in comments for models
                 var.vendorExtensions.put("x-commentType", var.datatype);
                 if (var.isContainer) {
-                    var.vendorExtensions.put("x-commentType", var.datatype+"[]");
+                    var.vendorExtensions.put("x-commentType", var.datatype + "[]");
                 }
 
                 if (var.isBoolean) {
@@ -421,7 +439,7 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
 
     @Override
     public String escapeReservedWord(String name) {
-        if(this.reservedWordsMappings().containsKey(name)) {
+        if (this.reservedWordsMappings().containsKey(name)) {
             return this.reservedWordsMappings().get(name);
         }
         return "_" + name;
@@ -579,7 +597,7 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
             // This parameter is an instance of a model
             return extractSimpleName(type);
         }
-        
+
         // PHP does not support type hinting for this parameter data type
         return "";
     }
