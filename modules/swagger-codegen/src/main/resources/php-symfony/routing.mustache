@@ -2,6 +2,8 @@
 # https://github.com/swagger-api/swagger-codegen
 # Do not edit the class manually.
 
+{{^supportLegacySymfony}}
+# NOTE: Without symfony legacy support {{supportLegacySymfony}}
 {{#apiInfo}}
 {{#apis}}
 {{#operations}}
@@ -12,6 +14,45 @@
     methods:  [{{httpMethod}}]
     defaults:
         _controller: {{bundleAlias}}.controller.{{pathPrefix}}::{{operationId}}Action
+    {{#hasPathParams}}
+    requirements:
+    {{/hasPathParams}}
+    {{#pathParams}}
+        {{#pattern}}
+        {{paramName}}: '{{pattern}}'
+        {{/pattern}}
+        {{^pattern}}
+        {{#isLong}}
+            {{paramName}}: '\d+'
+        {{/isLong}}
+        {{#isInteger}}
+            {{paramName}}: '\d+'
+        {{/isInteger}}
+        {{#isString}}
+            {{paramName}}: '[A-Za-z0-9-]+'
+        {{/isString}}
+        {{#isBoolean}}
+            {{paramName}}: 'true|false'
+        {{/isBoolean}}
+        {{/pattern}}
+    {{/pathParams}}
+{{/operation}}
+{{/operations}}
+{{/apis}}
+{{/apiInfo}}
+{{/supportLegacySymfony}}
+{{#supportLegacySymfony}}
+# NOTE: With symfony legacy support {{supportLegacySymfony}}
+{{#apiInfo}}
+{{#apis}}
+{{#operations}}
+# {{pathPrefix}}
+{{#operation}}
+{{bundleAlias}}_{{pathPrefix}}_{{operationIdLowerCase}}:
+    path:     {{path}}
+    methods:  [{{httpMethod}}]
+    defaults:
+        _controller: {{bundleAlias}}.controller.{{pathPrefix}}:{{operationId}}Action
     {{#hasPathParams}}
     requirements:
     {{/hasPathParams}}
@@ -39,3 +80,4 @@
 {{/operations}}
 {{/apis}}
 {{/apiInfo}}
+{{/supportLegacySymfony}}
