@@ -62,38 +62,6 @@ class Controller extends BaseController
     }
 
     /**
-     * This will return a response with code 400. Usage example:
-     *     return $this->createBadRequestResponse('Unable to access this page!');
-     *
-     * @param string $message A message
-     *
-     * @return Response
-     */
-    public function createBadRequestResponse($message = 'Bad Request.')
-    {
-        return new Response($message, 400);
-    }
-
-    /**
-     * This will return an error response. Usage example:
-     *     return $this->createErrorResponse(new UnauthorizedHttpException());
-     *
-     * @param HttpException $exception An HTTP exception
-     *
-     * @return Response
-     */
-    public function createErrorResponse(HttpException $exception)
-    {
-        $statusCode = $exception->getStatusCode();
-        $headers    = array_merge($exception->getHeaders(), ['Content-Type' => 'application/json']);
-
-        $json = $this->exceptionToArray($exception);
-        $json['statusCode'] = $statusCode;
-
-        return new Response(json_encode($json, 15, 512), $statusCode, $headers);
-    }
-
-    /**
      * Serializes data to a given type format.
      *
      * @param mixed  $data   The data to serialize.
@@ -124,11 +92,7 @@ class Controller extends BaseController
     protected function validate($data, $asserts = null)
     {
         $errors = $this->validator->validate($data, $asserts);
-
-        if (count($errors) > 0) {
-            $errorsString = (string)$errors;
-            return $this->createBadRequestResponse($errorsString);
-        }
+        return (array)$errors->getIterator();
     }
 
     /**

@@ -321,6 +321,11 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
         supportingFiles.add(new SupportingFile(".php_cs", getPackagePath(), ".php_cs"));
         supportingFiles.add(new SupportingFile("git_push.sh.mustache", getPackagePath(), "git_push.sh"));
 
+        supportingFiles.add(new SupportingFile("controller/ParametersNotValidException.php", toPackagePath(controllerPackage, srcBasePath), "ParametersNotValidException.php"));
+        supportingFiles.add(new SupportingFile("controller/ResponseFormatNotSupportedException.php", toPackagePath(controllerPackage, srcBasePath), "ResponseFormatNotSupportedException.php"));
+        supportingFiles.add(new SupportingFile("controller/ResponseNotValidException.php", toPackagePath(controllerPackage, srcBasePath), "ResponseNotValidException.php"));
+        supportingFiles.add(new SupportingFile("controller/RequestFormatNotSupportedException.php", toPackagePath(controllerPackage, srcBasePath), "RequestFormatNotSupportedException.php"));
+
         // Type-hintable primitive types
         // ref: http://php.net/manual/en/functions.arguments.php#functions.arguments.type-declaration
         if (phpLegacySupport) {
@@ -352,6 +357,7 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
 
         HashSet<CodegenSecurity> authMethods = new HashSet<>();
         List<CodegenOperation> operationList = (List<CodegenOperation>) operations.get("operation");
+        ArrayList<String> errorResponseTypes = new ArrayList<>();
 
         for (CodegenOperation op : operationList) {
             // Loop through all input parameters to determine, whether we have to import something to
@@ -383,6 +389,23 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
                 }
             }
 
+            List<CodegenResponse> responses = op.responses;
+            for (CodegenResponse response: responses) {
+                if (response.code == "200" || response.code == "201" || response.code == "202" || response.code == "204") {
+                    continue;
+                }
+                String returnType = response.dataType;
+                if (returnType == null) {
+                    continue;
+                }
+                if (response.isListContainer) {
+                    returnType = response.dataType + "[]";
+                }
+                if (response.simpleType && !response.primitiveType) {
+                    returnType = "\\" + returnType;
+                }
+                errorResponseTypes.add(returnType);
+            }
             // Create a variable to display the correct return type in comments for interfaces
             if (op.returnType != null) {
                 op.vendorExtensions.put("x-commentType", op.returnType);
@@ -398,7 +421,9 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
                 authMethods.addAll(op.authMethods);
             }
         }
-
+        HashSet<String> uniqueResponseTypes = new HashSet<>();
+        uniqueResponseTypes.addAll(errorResponseTypes);
+        operations.put("x-errorResponseTypes", String.join("|", uniqueResponseTypes));
         operations.put("authMethods", authMethods);
 
         return objs;

@@ -67,5 +67,14 @@ interface {{classname}}
      */
     public function {{operationId}}({{#allParams}}{{#vendorExtensions.x-parameterType}}{{vendorExtensions.x-parameterType}} {{/vendorExtensions.x-parameterType}}${{paramName}}{{^required}} = {{#defaultValue}}{{{.}}}{{/defaultValue}}{{^defaultValue}}null{{/defaultValue}}{{/required}}, {{/allParams}}&$responseCode = 200, array &$responseHeaders = []);
 {{/operation}}
-}
+
+    /**
+     * @param int $status The http status the error response reflects.
+     * @param array<string> $messages The messages for the error response.
+     * @param string $operationId The operationId of the api entry point.
+     * @return {{{x-errorResponseTypes}}}
+     */
+    public function createErrorResponse($status, $messages, $operationId);
 {{/operations}}
+
+}
