@@ -1,4 +1,4 @@
-$errors = [];
+$validationMessages = [];
 {{#allParams}}
             $asserts = [];
 {{#required}}
@@ -82,8 +82,11 @@ $errors = [];
             ]);
     {{/minItems}}
 {{/hasValidation}}
-            $errors = array_merge($errors, $this->validate(${{paramName}}, $asserts));
-{{/allParams}}
+            $errors = $this->validate(${{paramName}}, $asserts);
             if (count($errors) > 0) {
-                throw new ParametersNotValidException('Bad Request', 0, null, $errors);
+                $validationMessages = array_merge($validationMessages, $this->formatValidationMessages('{{paramName}}', $errors));
+            }
+{{/allParams}}
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
             }

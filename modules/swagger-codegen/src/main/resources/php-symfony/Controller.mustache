@@ -95,6 +95,14 @@ class Controller extends BaseController
         return (array)$errors->getIterator();
     }
 
+    protected function formatValidationMessages($parameterName, $validationMessages) {
+        $messages = [];
+        foreach ($validationMessages as $message) {
+            $messages[] = "{$parameterName}: {$message->getMessage()}";
+        }
+        return $messages;
+    }
+
     /**
      * Converts an exception to a serializable array.
      *
