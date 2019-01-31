@@ -124,38 +124,22 @@ class {{controllerName}} extends Controller
 
             // Read out all input parameter values into variables
             {{#queryParams}}
-            ${{paramName}} = $request->query->get('{{paramName}}');
+            ${{paramName}} = $request->query->get('{{paramName}}'{{#defaultValue}}, '{{defaultValue}}'{{/defaultValue}});
             {{/queryParams}}
             {{#headerParams}}
-            ${{paramName}} = $request->headers->get('{{baseName}}');
+            ${{paramName}} = $request->headers->get('{{paramName}}'{{#defaultValue}}, '{{defaultValue}}'{{/defaultValue}});
             {{/headerParams}}
             {{#formParams}}
             {{#isFile}}
             ${{paramName}} = $request->files->get('{{paramName}}');
             {{/isFile}}
             {{^isFile}}
-            ${{paramName}} = $request->request->get('{{paramName}}');
+            ${{paramName}} = $request->request->get('{{paramName}}'{{#defaultValue}}, '{{defaultValue}}'{{/defaultValue}});
             {{/isFile}}
             {{/formParams}}
             {{#bodyParams}}
             ${{paramName}} = $request->getContent();
             {{/bodyParams}}
-
-            // Use the default value if no value was provided
-            {{^required}}
-            {{#isContainer}}
-            {{#items}}
-            {{#defaultValue}}
-            ${{paramName}} = ${{paramName}}?:[{{{defaultValue}}}];
-            {{/defaultValue}}
-            {{/items}}
-            {{/isContainer}}
-            {{^isContainer}}
-            {{#defaultValue}}
-            ${{paramName}} = ${{paramName}}?:{{{defaultValue}}};
-            {{/defaultValue}}
-            {{/isContainer}}
-            {{/required}}
 
             // Deserialize the input values that needs it
             {{#allParams}}
