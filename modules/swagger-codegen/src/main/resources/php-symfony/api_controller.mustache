@@ -57,6 +57,7 @@ class {{controllerName}} extends Controller
      */
     public function {{operationId}}Action(Request $request{{#hasPathParams}}{{#pathParams}}, ${{paramName}}{{/pathParams}}{{/hasPathParams}})
     {
+        $this->logger->info($request, ['operation' => '{{controllerName}}::{{operationId}}']);
         // get the handler for the api first, we need it throughout the whole function
         $handler = $this->getApiHandler();
 
@@ -189,20 +190,22 @@ class {{controllerName}} extends Controller
             $responseHeaders = [];
             $response = $handler->createErrorResponse(415, [$exception->getMessage()], '{{operationId}}');
         } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => '{{controllerName}}::{{operationId}}']);
             $responseCode = 500;
             $responseHeaders = [];
             $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), '{{operationId}}');
-        } catch (Exception $fallthrough) {
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => '{{controllerName}}::{{operationId}}']);
             $responseCode = 500;
             $responseHeaders = [];
-            $response = $handler->createErrorResponse(500, [$fallthrough->getMessage()], '{{operationId}}');
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], '{{operationId}}');
         }
         if ($responseFormat === null) {
             $responseFormat = reset($produces);
         }
         $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
         if ($response !== null) {
-            return new Response(
+            $responseObject = new Response(
                 $response ? $this->serialize($response, $responseFormat) : '',
                 $responseCode,
                 array_merge(
@@ -213,6 +216,8 @@ class {{controllerName}} extends Controller
                     ]
                 )
             );
+            $this->logger->info($responseObject, ['operation' => '{{controllerName}}::{{operationId}}']);
+            return $responseObject;
         }
     }
     {{/operation}}
