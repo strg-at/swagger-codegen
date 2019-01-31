@@ -84,7 +84,10 @@ $validationMessages = [];
 {{/hasValidation}}
             $errors = $this->validate(${{paramName}}, $asserts);
             if (count($errors) > 0) {
-                $validationMessages = array_merge($validationMessages, $this->formatValidationMessages('{{paramName}}', $errors));
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('{{baseName}}', $errors)
+                );
             }
 {{/allParams}}
             if (count($validationMessages) > 0) {
