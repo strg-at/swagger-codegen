@@ -21,14 +21,26 @@
     {{/isContainer}}
 {{/isEnum}}
 {{#isContainer}}
+{{#isMapContainer}}
      * @Assert\All({
     {{#items}}
      *   @Assert\Type("{{datatype}}")
     {{/items}}
      * })
-     {{#items}}
+    {{#items}}
+     * @Type("array<string,{{datatype}}>")
+    {{/items}}
+{{/isMapContainer}}
+{{#isListContainer}}
+     * @Assert\All({
+    {{#items}}
+     *   @Assert\Type("{{datatype}}")
+    {{/items}}
+     * })
+    {{#items}}
      * @Type("array<{{datatype}}>")
-     {{/items}}
+    {{/items}}
+{{/isListContainer}}
 {{/isContainer}}
 {{^isContainer}}
     {{#isDate}}
