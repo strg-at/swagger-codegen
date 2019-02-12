@@ -125,17 +125,17 @@ class {{controllerName}} extends Controller
 
             // Read out all input parameter values into variables
             {{#queryParams}}
-            ${{paramName}} = $request->query->get('{{baseName}}'{{#defaultValue}}, '{{defaultValue}}'{{/defaultValue}});
+            ${{paramName}} = $request->query->get('{{vendorExtensions.x-parameterName}}'{{#defaultValue}}, '{{defaultValue}}'{{/defaultValue}});
             {{/queryParams}}
             {{#headerParams}}
-            ${{paramName}} = $request->headers->get('{{baseName}}'{{#defaultValue}}, '{{defaultValue}}'{{/defaultValue}});
+            ${{paramName}} = $request->headers->get('{{vendorExtensions.x-parameterName}}'{{#defaultValue}}, '{{defaultValue}}'{{/defaultValue}});
             {{/headerParams}}
             {{#formParams}}
             {{#isFile}}
-            ${{paramName}} = $request->files->get('{{baseName}}');
+            ${{paramName}} = $request->files->get('{{vendorExtensions.x-parameterName}}');
             {{/isFile}}
             {{^isFile}}
-            ${{paramName}} = $request->request->get('{{baseName}}'{{#defaultValue}}, '{{defaultValue}}'{{/defaultValue}});
+            ${{paramName}} = $request->request->get('{{vendorExtensions.x-parameterName}}'{{#defaultValue}}, '{{defaultValue}}'{{/defaultValue}});
             {{/isFile}}
             {{/formParams}}
             {{#bodyParams}}

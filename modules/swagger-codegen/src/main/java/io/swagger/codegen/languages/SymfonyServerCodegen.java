@@ -360,6 +360,7 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
         ArrayList<String> errorResponseTypes = new ArrayList<>();
 
         for (CodegenOperation op : operationList) {
+
             // Loop through all input parameters to determine, whether we have to import something to
             // make the input type available.
             for (CodegenParameter param : op.allParams) {

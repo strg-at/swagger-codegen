@@ -645,6 +645,10 @@ public abstract class AbstractPhpCodegen extends DefaultCodegen implements Codeg
         List<CodegenOperation> operationList = (List<CodegenOperation>) operations.get("operation");
         for (CodegenOperation op : operationList) {
             op.vendorExtensions.put("x-testOperationId", camelize(op.operationId));
+            // Loop through all query params because we need to sanitize the name given to $_GET
+            for (CodegenParameter param : op.queryParams) {
+                param.vendorExtensions.put("x-parameterName", param.baseName.replace('.', '_'));
+            }
         }
         return objs;
     }
