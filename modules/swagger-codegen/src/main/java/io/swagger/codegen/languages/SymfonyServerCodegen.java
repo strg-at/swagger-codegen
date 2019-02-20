@@ -321,10 +321,10 @@ public class SymfonyServerCodegen extends AbstractPhpCodegen implements CodegenC
         supportingFiles.add(new SupportingFile(".php_cs", getPackagePath(), ".php_cs"));
         supportingFiles.add(new SupportingFile("git_push.sh.mustache", getPackagePath(), "git_push.sh"));
 
-        supportingFiles.add(new SupportingFile("controller/ParametersNotValidException.php", toPackagePath(controllerPackage, srcBasePath), "ParametersNotValidException.php"));
-        supportingFiles.add(new SupportingFile("controller/ResponseFormatNotSupportedException.php", toPackagePath(controllerPackage, srcBasePath), "ResponseFormatNotSupportedException.php"));
-        supportingFiles.add(new SupportingFile("controller/ResponseNotValidException.php", toPackagePath(controllerPackage, srcBasePath), "ResponseNotValidException.php"));
-        supportingFiles.add(new SupportingFile("controller/RequestFormatNotSupportedException.php", toPackagePath(controllerPackage, srcBasePath), "RequestFormatNotSupportedException.php"));
+        supportingFiles.add(new SupportingFile("ParametersNotValidException.mustache", toPackagePath(controllerPackage, srcBasePath), "ParametersNotValidException.php"));
+        supportingFiles.add(new SupportingFile("ResponseFormatNotSupportedException.mustache", toPackagePath(controllerPackage, srcBasePath), "ResponseFormatNotSupportedException.php"));
+        supportingFiles.add(new SupportingFile("ResponseNotValidException.mustache", toPackagePath(controllerPackage, srcBasePath), "ResponseNotValidException.php"));
+        supportingFiles.add(new SupportingFile("RequestFormatNotSupportedException.mustache", toPackagePath(controllerPackage, srcBasePath), "RequestFormatNotSupportedException.php"));
 
         // Type-hintable primitive types
         // ref: http://php.net/manual/en/functions.arguments.php#functions.arguments.type-declaration
