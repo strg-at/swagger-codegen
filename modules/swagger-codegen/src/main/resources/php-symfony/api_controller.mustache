@@ -85,12 +85,12 @@ class {{controllerName}} extends Controller
             {{#produces}}'{{{mediaType}}}',{{/produces}}
         ];
         try {
-            $contentType = $request->headers->has('Content-Type') ? $request->headers->get('Content-Type') : $consumes[0];
+            {{#bodyParams}}$contentType = $request->headers->has('Content-Type') ? $request->headers->get('Content-Type') : $consumes[0];
             $requestFormat = $this->getOutputFormat($contentType, $consumes);
             if ($requestFormat === null) {
                 // We can't consume the content that the client is sending us
                 throw new RequestFormatNotSupportedException();
-            }
+            }{{/bodyParams}}
 
             // Figure out what the client accepts
             $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
@@ -200,7 +200,8 @@ class {{controllerName}} extends Controller
             $response = $handler->createErrorResponse(500, [$exception->getMessage()], '{{operationId}}');
         }
         if ($responseFormat === null) {
-            $responseFormat = reset($produces);
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
         }
         $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
         if ($response !== null) {

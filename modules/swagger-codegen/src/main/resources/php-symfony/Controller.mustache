@@ -129,33 +129,37 @@ class Controller extends BaseController
         ];
     }
 
-    protected function getOutputFormat($accept, array $produced)
-    {
-        $produced = array_map(function ($value) {
+    protected function sanitizeContentTypes($contentTypes) {
+        return array_map(function ($value) {
             if (strpos($value, ';') === false) {
                 return $value;
             }
             $splitValue = explode(';', $value);
             return array_shift($splitValue);
-        }, $produced);
+        }, $contentTypes);
+    }
+
+    protected function getOutputFormat($accept, array $produced)
+    {
+        $producedContentTypes = $this->sanitizeContentTypes($produced);
         // Figure out what the client accepts
         $accept = preg_split("/[\s,;]+/", $accept);
         
         if (in_array('*/*', $accept) || in_array('application/*', $accept)) {
             // Prefer JSON if the client has no preference
-            if (in_array('application/json', $produced)) {
+            if (in_array('application/json', $producedContentTypes)) {
                 return 'application/json';
             }
-            if (in_array('application/xml', $produced)) {
+            if (in_array('application/xml', $producedContentTypes)) {
                 return 'application/xml';
             }
         }
 
-        if (in_array('application/json', $accept) && in_array('application/json', $produced)) {
+        if (in_array('application/json', $accept) && in_array('application/json', $producedContentTypes)) {
             return 'application/json';
         }
 
-        if (in_array('application/xml', $accept) && in_array('application/xml', $produced)) {
+        if (in_array('application/xml', $accept) && in_array('application/xml', $producedContentTypes)) {
             return 'application/xml';
         }
 
