@@ -74,25 +74,24 @@ class {{controllerName}} extends Controller
         // set response and format to null, we need the variable even when not set
         $response = null;
         $responseFormat = null;
-        try {
-            {{#bodyParams}}
-            // Make sure that the client is providing something that we can consume
-            $consumes = [
-                {{#consumes}}
-                '{{{mediaType}}}',
-                {{/consumes}}
-            ];
 
-            $inputFormat = $request->headers->has('Content-Type') ? $request->headers->get('Content-Type') : $consumes[0];
-            if (!in_array($inputFormat, $consumes)) {
+        {{#bodyParams}}// Make sure that the client is providing something that we can consume
+        $consumes = [
+            {{#consumes}}'{{{mediaType}}}',{{/consumes}}
+        ];{{/bodyParams}}
+
+        // Figure out what data format to return to the client
+        $produces = [
+            {{#produces}}'{{{mediaType}}}',{{/produces}}
+        ];
+        try {
+            $contentType = $request->headers->has('Content-Type') ? $request->headers->get('Content-Type') : $consumes[0];
+            $requestFormat = $this->getOutputFormat($contentType, $consumes);
+            if ($requestFormat === null) {
                 // We can't consume the content that the client is sending us
                 throw new RequestFormatNotSupportedException();
             }
 
-            {{/bodyParams}}
-
-            // Figure out what data format to return to the client
-            $produces = [{{#produces}}'{{{mediaType}}}'{{#hasMore}}, {{/hasMore}}{{/produces}}];
             // Figure out what the client accepts
             $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
             $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
@@ -146,7 +145,7 @@ class {{controllerName}} extends Controller
             {{#allParams}}
             {{^isFile}}
             {{#isBodyParam}}
-            ${{paramName}} = $this->deserialize(${{paramName}}, '{{#isContainer}}{{#items}}array<{{datatype}}>{{/items}}{{/isContainer}}{{^isContainer}}{{dataType}}{{/isContainer}}', $inputFormat);
+            ${{paramName}} = $this->deserialize(${{paramName}}, '{{#isContainer}}{{#items}}array<{{datatype}}>{{/items}}{{/isContainer}}{{^isContainer}}{{dataType}}{{/isContainer}}', $requestFormat);
             {{/isBodyParam}}
             {{^isBodyParam}}
             ${{paramName}} = $this->deserialize(${{paramName}}, '{{#isContainer}}array<{{#collectionFormat}}{{collectionFormat}}{{/collectionFormat}}{{^collectionFormat}}csv{{/collectionFormat}},{{dataType}}>{{/isContainer}}{{^isContainer}}{{dataType}}{{/isContainer}}', 'string');
