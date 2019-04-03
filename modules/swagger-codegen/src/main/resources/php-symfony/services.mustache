@@ -7,6 +7,11 @@ parameters:
     {{bundleAlias}}.validator:  '{{servicePackage}}\SymfonyValidator'
 
 services:
+    _defaults:
+        autowire: true
+        autoconfigure: false
+        public: false
+
     {{bundleAlias}}.api.api_server:
         class: {{apiPackage}}\ApiServer
 
@@ -16,9 +21,6 @@ services:
     {{bundleAlias}}.service.serializer:
         class: "%{{bundleAlias}}.serializer%"
 
-    {{bundleAlias}}.service.validator:
-        class: "%{{bundleAlias}}.validator%"
-
 {{#apiInfo}}
 {{#apis}}
 {{#operations}}
@@ -27,9 +29,7 @@ services:
         public: true
         calls:
          - [setSerializer, ['@{{bundleAlias}}.service.serializer']]
-         - [setValidator,  ['@{{bundleAlias}}.service.validator']]
          - [setApiServer,  ['@{{bundleAlias}}.api.api_server']]
-         - [setLogger,     ['@monolog.logger.request']]
 
 {{/operations}}
 {{/apis}}

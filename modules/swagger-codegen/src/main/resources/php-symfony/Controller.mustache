@@ -23,7 +23,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller as BaseController;
 use {{servicePackage}}\SerializerInterface;
-use {{servicePackage}}\ValidatorInterface;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -41,9 +41,11 @@ class Controller extends BaseController
     protected $apiServer;
     protected $logger;
 
-    public function setValidator(ValidatorInterface $validator)
+
+    public function __construct(ValidatorInterface $validator, LoggerInterface $logger)
     {
         $this->validator = $validator;
+        $this->logger = $logger;
     }
 
     public function setSerializer(SerializerInterface $serializer)
@@ -54,11 +56,6 @@ class Controller extends BaseController
     public function setApiServer($server)
     {
         $this->apiServer = $server;
-    }
-
-    public function setLogger(LoggerInterface $logger)
-    {
-        $this->logger = $logger;
     }
 
     /**
@@ -98,7 +95,11 @@ class Controller extends BaseController
     protected function formatValidationMessages($parameterName, $validationMessages) {
         $messages = [];
         foreach ($validationMessages as $message) {
-            $messages[] = "{$parameterName}: {$message->getMessage()}";
+            $formattedMessage = "{$parameterName}: {$message->getMessage()}";
+            if ($message->getPropertyPath()) {
+                $formattedMessage = "{$parameterName}.{$message->getPropertyPath()}: {$message->getMessage()}";
+            }
+            $messages[] = $formattedMessage;
         }
         return $messages;
     }

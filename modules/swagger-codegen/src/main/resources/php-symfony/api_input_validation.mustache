@@ -36,7 +36,12 @@ $validationMessages = [];
             $asserts[] = new Assert\File();
     {{/isFile}}
     {{^isFile}}
+        {{#isPrimitiveType}}
             $asserts[] = new Assert\Type("{{dataType}}");
+        {{/isPrimitiveType}}
+        {{^isPrimitiveType}}
+            $asserts = null;
+        {{/isPrimitiveType}}
     {{/isFile}}
     {{/isDateTime}}
     {{/isDate}}
