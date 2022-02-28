@@ -127,7 +127,7 @@ class {{controllerName}} extends Controller
             ${{paramName}} = $request->query->get('{{vendorExtensions.x-parameterName}}'{{#defaultValue}}, '{{defaultValue}}'{{/defaultValue}});
             {{/queryParams}}
             {{#headerParams}}
-            ${{paramName}} = $request->headers->get('{{vendorExtensions.x-parameterName}}'{{#defaultValue}}, '{{defaultValue}}'{{/defaultValue}});
+            ${{paramName}} = $request->headers->get('{{baseName}}'{{#defaultValue}}, '{{defaultValue}}'{{/defaultValue}});
             {{/headerParams}}
             {{#formParams}}
             {{#isFile}}
