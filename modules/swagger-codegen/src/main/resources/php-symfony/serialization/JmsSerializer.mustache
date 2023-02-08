@@ -2,12 +2,7 @@
 
 namespace {{servicePackage}};
 
-use JMS\Serializer\Handler\PropelCollectionHandler;
-use JMS\Serializer\Handler\StdClassHandler;
 use JMS\Serializer\SerializerBuilder;
-use JMS\Serializer\Naming\CamelCaseNamingStrategy;
-use JMS\Serializer\Naming\SerializedNameAnnotationStrategy;
-use JMS\Serializer\XmlDeserializationVisitor;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 class JmsSerializer implements SerializerInterface
@@ -18,25 +13,10 @@ class JmsSerializer implements SerializerInterface
 
     public function __construct(ContainerInterface $container)
     {
-        $naming_strategy = new SerializedNameAnnotationStrategy(new CamelCaseNamingStrategy());
         $this->deserializer = SerializerBuilder::create()
-            ->setDeserializationVisitor('json', new StrictJsonDeserializationVisitor($naming_strategy))
-            ->setDeserializationVisitor('xml', new XmlDeserializationVisitor($naming_strategy))
             ->build();
 
-        $dateHandler = $container->get('jms_serializer.datetime_handler');
-        $phpCollectionHandler = $container->get('jms_serializer.php_collection_handler');
-        $arrayCollectionHandler = $container->get('jms_serializer.array_collection_handler');
         $this->serializer = SerializerBuilder::create()
-            ->configureHandlers(
-                function ($registry) use ($dateHandler, $phpCollectionHandler, $arrayCollectionHandler) {
-                    $registry->registerSubscribingHandler($dateHandler);
-                    $registry->registerSubscribingHandler(new StdClassHandler());
-                    $registry->registerSubscribingHandler($phpCollectionHandler);
-                    $registry->registerSubscribingHandler($arrayCollectionHandler);
-                    $registry->registerSubscribingHandler(new PropelCollectionHandler());
-                }
-            )
             ->build();
     }
 
