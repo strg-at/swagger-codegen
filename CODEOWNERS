@@ -1,2 +1,3 @@
 .github/ @strg-at/infra
 **/Dockerfile* @strg-at/infra
+/.dockerignore @strg-at/infra
