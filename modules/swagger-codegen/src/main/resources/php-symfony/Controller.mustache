@@ -155,7 +155,7 @@ class Controller extends AbstractController
         }
 
         if (in_array('*/*', $accept)) {
-            // Prefer JSON if the client has no preference
+            // Prefer HTML if the client has no preference
             if (in_array('text/html', $producedContentTypes)) {
                 return 'text/html';
             }
