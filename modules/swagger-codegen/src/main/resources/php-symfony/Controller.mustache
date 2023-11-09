@@ -154,12 +154,23 @@ class Controller extends AbstractController
             }
         }
 
+        if (in_array('*/*', $accept)) {
+            // Prefer HTML if the client has no preference
+            if (in_array('text/html', $producedContentTypes)) {
+                return 'text/html';
+            }
+        }
+
         if (in_array('application/json', $accept) && in_array('application/json', $producedContentTypes)) {
             return 'application/json';
         }
 
         if (in_array('application/xml', $accept) && in_array('application/xml', $producedContentTypes)) {
             return 'application/xml';
+        }
+
+        if (in_array('text/html', $accept) && in_array('text/html', $producedContentTypes)) {
+            return 'text/html';
         }
 
         // If we reach this point, we don't have a common ground between server and client

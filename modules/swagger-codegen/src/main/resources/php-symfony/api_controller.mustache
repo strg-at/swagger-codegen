@@ -205,8 +205,13 @@ class {{controllerName}} extends Controller
         }
         $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
         if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
+            }
+
             $responseObject = new Response(
-                $response ? $this->serialize($response, $responseFormat) : '',
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
