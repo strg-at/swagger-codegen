@@ -1,3 +1,4 @@
 .github/ @strg-at/infra
-**/Dockerfile* @strg-at/infra
-/.dockerignore @strg-at/infra
+/CODEOWNERS @strg-at/infra
+**/Dockerfile* @strg-at/infra @strg-at/dev-leads
+/.dockerignore @strg-at/infra @strg-at/dev-leads
