@@ -48,28 +48,28 @@ class PetApiInterfaceTest extends WebTestCase
     /**
      * Setup before running any test cases
      */
-    public static function setUpBeforeClass()
+    public static function setUpBeforeClass(): void
     {
     }
 
     /**
      * Setup before running each test case
      */
-    public function setUp()
+    public function setUp(): void
     {
     }
 
     /**
      * Clean up after running each test case
      */
-    public function tearDown()
+    public function tearDown(): void
     {
     }
 
     /**
      * Clean up after running all test cases
      */
-    public static function tearDownAfterClass()
+    public static function tearDownAfterClass(): void
     {
     }
 
@@ -79,7 +79,7 @@ class PetApiInterfaceTest extends WebTestCase
      * Add a new pet to the store.
      *
      */
-    public function testAddPet()
+    public function testAddPet(): void
     {
         $client = static::createClient();
 
@@ -94,7 +94,7 @@ class PetApiInterfaceTest extends WebTestCase
      * Deletes a pet.
      *
      */
-    public function testDeletePet()
+    public function testDeletePet(): void
     {
         $client = static::createClient();
 
@@ -112,7 +112,7 @@ class PetApiInterfaceTest extends WebTestCase
      * Finds Pets by status.
      *
      */
-    public function testFindPetsByStatus()
+    public function testFindPetsByStatus(): void
     {
         $client = static::createClient();
 
@@ -127,7 +127,7 @@ class PetApiInterfaceTest extends WebTestCase
      * Finds Pets by tags.
      *
      */
-    public function testFindPetsByTags()
+    public function testFindPetsByTags(): void
     {
         $client = static::createClient();
 
@@ -142,7 +142,7 @@ class PetApiInterfaceTest extends WebTestCase
      * Find pet by ID.
      *
      */
-    public function testGetPetById()
+    public function testGetPetById(): void
     {
         $client = static::createClient();
 
@@ -160,7 +160,7 @@ class PetApiInterfaceTest extends WebTestCase
      * Update an existing pet.
      *
      */
-    public function testUpdatePet()
+    public function testUpdatePet(): void
     {
         $client = static::createClient();
 
@@ -175,7 +175,7 @@ class PetApiInterfaceTest extends WebTestCase
      * Updates a pet in the store with form data.
      *
      */
-    public function testUpdatePetWithForm()
+    public function testUpdatePetWithForm(): void
     {
         $client = static::createClient();
 
@@ -193,7 +193,7 @@ class PetApiInterfaceTest extends WebTestCase
      * uploads an image.
      *
      */
-    public function testUploadFile()
+    public function testUploadFile(): void
     {
         $client = static::createClient();
 
@@ -205,7 +205,7 @@ class PetApiInterfaceTest extends WebTestCase
         $crawler = $client->request('POST', $path);
     }
 
-    protected function genTestData($regexp)
+    protected function genTestData($regexp): mixed
     {
         $grammar  = new \Hoa\File\Read('hoa://Library/Regex/Grammar.pp');
         $compiler = \Hoa\Compiler\Llk\Llk::load($grammar);

@@ -127,9 +127,9 @@ class Controller extends AbstractController
      *
      * @param \Exception|null $exception
      *
-     * @return array
+     * @return array|null
      */
-    private function exceptionToArray(\Exception $exception = null)
+    private function exceptionToArray(?\Exception $exception = null)
     {
         if (null === $exception) {
             return null;

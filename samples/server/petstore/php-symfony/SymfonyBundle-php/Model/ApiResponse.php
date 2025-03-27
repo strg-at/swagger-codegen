@@ -71,7 +71,7 @@ class ApiResponse
      * Constructor
      * @param mixed[] $data Associated array of property values initializing the model
      */
-    public function __construct(array $data = null)
+    public function __construct(?array $data = null)
     {
         $this->code = isset($data['code']) ? $data['code'] : null;
         $this->type = isset($data['type']) ? $data['type'] : null;
