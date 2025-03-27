@@ -29,10 +29,13 @@
 
 namespace Swagger\Server\Controller;
 
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Exception\HttpException;
+use Psr\Log\LoggerInterface;
+use Psr\Container\ContainerInterface;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Swagger\Server\Service\SerializerInterface;
-use Swagger\Server\Service\ValidatorInterface;
+use Swagger\Server\Api\ApiServer;
+use Swagger\Server\Service\JmsSerializer;
+use Swagger\Server\Service\SymfonyValidator;
 
 /**
  * Controller Class Doc Comment
@@ -42,15 +45,25 @@ use Swagger\Server\Service\ValidatorInterface;
  * @author   Swagger Codegen team
  * @link     https://github.com/swagger-api/swagger-codegen
  */
-class Controller
+class Controller extends AbstractController
 {
     protected $validator;
     protected $serializer;
     protected $apiServer;
+    protected $logger;
 
-    public function setValidator(ValidatorInterface $validator)
-    {
+    public function __construct(
+        ContainerInterface $container,
+        LoggerInterface $logger,
+        JmsSerializer $serializer,
+        SymfonyValidator $validator,
+        ApiServer $apiServer
+    ) {
+        $this->setContainer($container); // ✅ Correct way to set the container
+        $this->logger = $logger;
+        $this->serializer = $serializer;
         $this->validator = $validator;
+        $this->apiServer = $apiServer;
     }
 
     public function setSerializer(SerializerInterface $serializer)
@@ -61,38 +74,6 @@ class Controller
     public function setApiServer($server)
     {
         $this->apiServer = $server;
-    }
-
-    /**
-     * This will return a response with code 400. Usage example:
-     *     return $this->createBadRequestResponse('Unable to access this page!');
-     *
-     * @param string $message A message
-     *
-     * @return Response
-     */
-    public function createBadRequestResponse($message = 'Bad Request.')
-    {
-        return new Response($message, 400);
-    }
-
-    /**
-     * This will return an error response. Usage example:
-     *     return $this->createErrorResponse(new UnauthorizedHttpException());
-     *
-     * @param HttpException $exception An HTTP exception
-     *
-     * @return Response
-     */
-    public function createErrorResponse(HttpException $exception)
-    {
-        $statusCode = $exception->getStatusCode();
-        $headers    = array_merge($exception->getHeaders(), ['Content-Type' => 'application/json']);
-
-        $json = $this->exceptionToArray($exception);
-        $json['statusCode'] = $statusCode;
-
-        return new Response(json_encode($json, 15, 512), $statusCode, $headers);
     }
 
     /**
@@ -126,11 +107,19 @@ class Controller
     protected function validate($data, $asserts = null)
     {
         $errors = $this->validator->validate($data, $asserts);
+        return (array)$errors->getIterator();
+    }
 
-        if (count($errors) > 0) {
-            $errorsString = (string)$errors;
-            return $this->createBadRequestResponse($errorsString);
+    protected function formatValidationMessages($parameterName, $validationMessages) {
+        $messages = [];
+        foreach ($validationMessages as $message) {
+            $formattedMessage = "{$parameterName}: {$message->getMessage()}";
+            if ($message->getPropertyPath()) {
+                $formattedMessage = "{$parameterName}.{$message->getPropertyPath()}: {$message->getMessage()}";
+            }
+            $messages[] = $formattedMessage;
         }
+        return $messages;
     }
 
     /**
@@ -159,27 +148,49 @@ class Controller
         ];
     }
 
+    protected function sanitizeContentTypes($contentTypes) {
+        return array_map(function ($value) {
+            if (strpos($value, ';') === false) {
+                return $value;
+            }
+            $splitValue = explode(';', $value);
+            return array_shift($splitValue);
+        }, $contentTypes);
+    }
+
     protected function getOutputFormat($accept, array $produced)
     {
+        $producedContentTypes = $this->sanitizeContentTypes($produced);
         // Figure out what the client accepts
-        $accept = preg_split("/[\s,]+/", $accept);
-        
+        $accept = preg_split("/[\s,;]+/", $accept);
+
         if (in_array('*/*', $accept) || in_array('application/*', $accept)) {
             // Prefer JSON if the client has no preference
-            if (in_array('application/json', $produced)) {
+            if (in_array('application/json', $producedContentTypes)) {
                 return 'application/json';
             }
-            if (in_array('application/xml', $produced)) {
+            if (in_array('application/xml', $producedContentTypes)) {
                 return 'application/xml';
             }
         }
 
-        if (in_array('application/json', $accept) && in_array('application/json', $produced)) {
+        if (in_array('*/*', $accept)) {
+            // Prefer HTML if the client has no preference
+            if (in_array('text/html', $producedContentTypes)) {
+                return 'text/html';
+            }
+        }
+
+        if (in_array('application/json', $accept) && in_array('application/json', $producedContentTypes)) {
             return 'application/json';
         }
 
-        if (in_array('application/xml', $accept) && in_array('application/xml', $produced)) {
+        if (in_array('application/xml', $accept) && in_array('application/xml', $producedContentTypes)) {
             return 'application/xml';
+        }
+
+        if (in_array('text/html', $accept) && in_array('text/html', $producedContentTypes)) {
+            return 'text/html';
         }
 
         // If we reach this point, we don't have a common ground between server and client

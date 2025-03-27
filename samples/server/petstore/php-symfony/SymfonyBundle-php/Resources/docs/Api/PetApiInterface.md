@@ -120,7 +120,7 @@ class PetApi implements PetApiInterface
     /**
      * Implementation of PetApiInterface#deletePet
      */
-    public function deletePet($petId, $apiKey = null)
+    public function deletePet(int $petId, string $apiKey = null)
     {
         // Implement the operation ...
     }
@@ -307,7 +307,7 @@ class PetApi implements PetApiInterface
     /**
      * Implementation of PetApiInterface#getPetById
      */
-    public function getPetById($petId)
+    public function getPetById(int $petId)
     {
         // Implement the operation ...
     }
@@ -431,7 +431,7 @@ class PetApi implements PetApiInterface
     /**
      * Implementation of PetApiInterface#updatePetWithForm
      */
-    public function updatePetWithForm($petId, $name = null, $status = null)
+    public function updatePetWithForm(int $petId, string $name = null, string $status = null)
     {
         // Implement the operation ...
     }
@@ -495,7 +495,7 @@ class PetApi implements PetApiInterface
     /**
      * Implementation of PetApiInterface#uploadFile
      */
-    public function uploadFile($petId, $additionalMetadata = null, UploadedFile $file = null)
+    public function uploadFile(int $petId, string $additionalMetadata = null, UploadedFile $file = null)
     {
         // Implement the operation ...
     }

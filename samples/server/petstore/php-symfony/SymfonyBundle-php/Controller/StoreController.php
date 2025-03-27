@@ -35,6 +35,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Validator\Constraints as Assert;
 use Swagger\Server\Api\StoreApiInterface;
+use Psr\Log\LoggerInterface;
 use Swagger\Server\Model\Order;
 
 /**
@@ -58,69 +59,129 @@ class StoreController extends Controller
      */
     public function deleteOrderAction(Request $request, $orderId)
     {
+        $this->logger->info($request, ['operation' => 'StoreController::deleteOrder']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            400 => [
+                'message' => 'Invalid ID supplied',
+                'responseType' => '',
+            ],
+            404 => [
+                'message' => 'Order not found',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
+        
+
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-
-        // Read out all input parameter values into variables
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $orderId = $this->deserialize($orderId, 'string', 'string');
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\Type("string");
-        $response = $this->validate($orderId, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+
+            // Read out all input parameter values into variables
+
+            // Deserialize the input values that needs it
+            $orderId = $this->deserialize($orderId, 'string', 'string');
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts[] = new Assert\Type("string");
+            $errors = $this->validate($orderId, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('orderId', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             
             // Make the call to the business logic
             $responseCode = 204;
             $responseHeaders = [];
-            $result = $handler->deleteOrder($orderId, $responseCode, $responseHeaders);
+            $response = $handler->deleteOrder($orderId, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = '';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 400:
-                    $message = 'Invalid ID supplied';
-                    break;
-                case 404:
-                    $message = 'Order not found';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'deleteOrder');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'deleteOrder');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'deleteOrder');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'StoreController::deleteOrder']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'deleteOrder');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'StoreController::deleteOrder']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'deleteOrder');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'StoreController::deleteOrder']);
+            return $responseObject;
         }
     }
 
@@ -134,31 +195,53 @@ class StoreController extends Controller
      */
     public function getInventoryAction(Request $request)
     {
+        $this->logger->info($request, ['operation' => 'StoreController::getInventory']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            200 => [
+                'message' => 'successful operation',
+                'responseType' => 'int',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
+        
+
         // Figure out what data format to return to the client
-        $produces = ['application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-        // Authentication 'api_key' required
-        // Set key with prefix in header
-        $securityapi_key = $request->headers->get('api_key');
-
-        // Read out all input parameter values into variables
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-
-        // Validate the input values
-
-
+        $produces = [
+            'application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+            // Authentication 'api_key' required
+            // Set key with prefix in header
+            $securityapi_key = $request->headers->get('api_key');
+
+            // Read out all input parameter values into variables
+
+            // Deserialize the input values that needs it
+
+            // Validate the input values
+            $validationMessages = [];
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             // Set authentication method 'api_key'
             $handler->setapi_key($securityapi_key);
@@ -166,31 +249,65 @@ class StoreController extends Controller
             // Make the call to the business logic
             $responseCode = 200;
             $responseHeaders = [];
-            $result = $handler->getInventory($responseCode, $responseHeaders);
+            $response = $handler->getInventory($responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = 'successful operation';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 200:
-                    $message = 'successful operation';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'getInventory');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'getInventory');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'getInventory');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'StoreController::getInventory']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'getInventory');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'StoreController::getInventory']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'getInventory');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'StoreController::getInventory']);
+            return $responseObject;
         }
     }
 
@@ -204,74 +321,135 @@ class StoreController extends Controller
      */
     public function getOrderByIdAction(Request $request, $orderId)
     {
+        $this->logger->info($request, ['operation' => 'StoreController::getOrderById']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            200 => [
+                'message' => 'successful operation',
+                'responseType' => 'Swagger\Server\Model\Order',
+            ],
+            400 => [
+                'message' => 'Invalid ID supplied',
+                'responseType' => '',
+            ],
+            404 => [
+                'message' => 'Order not found',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
+        
+
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-
-        // Read out all input parameter values into variables
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $orderId = $this->deserialize($orderId, 'int', 'string');
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\Type("int");
-        $asserts[] = new Assert\GreaterThanOrEqual(1);
-        $asserts[] = new Assert\LessThanOrEqual(1);
-        $response = $this->validate($orderId, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+
+            // Read out all input parameter values into variables
+
+            // Deserialize the input values that needs it
+            $orderId = $this->deserialize($orderId, 'int', 'string');
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts[] = new Assert\Type("int");
+            $asserts[] = new Assert\GreaterThanOrEqual(1);
+            $asserts[] = new Assert\LessThanOrEqual(5);
+            $errors = $this->validate($orderId, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('orderId', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             
             // Make the call to the business logic
             $responseCode = 200;
             $responseHeaders = [];
-            $result = $handler->getOrderById($orderId, $responseCode, $responseHeaders);
+            $response = $handler->getOrderById($orderId, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = 'successful operation';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 200:
-                    $message = 'successful operation';
-                    break;
-                case 400:
-                    $message = 'Invalid ID supplied';
-                    break;
-                case 404:
-                    $message = 'Order not found';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'getOrderById');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'getOrderById');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'getOrderById');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'StoreController::getOrderById']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'getOrderById');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'StoreController::getOrderById']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'getOrderById');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'StoreController::getOrderById']);
+            return $responseObject;
         }
     }
 
@@ -285,78 +463,138 @@ class StoreController extends Controller
      */
     public function placeOrderAction(Request $request)
     {
+        $this->logger->info($request, ['operation' => 'StoreController::placeOrder']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            200 => [
+                'message' => 'successful operation',
+                'responseType' => 'Swagger\Server\Model\Order',
+            ],
+            400 => [
+                'message' => 'Invalid Order',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
         // Make sure that the client is providing something that we can consume
-        $consumes = [];
-        $inputFormat = $request->headers->has('Content-Type')?$request->headers->get('Content-Type'):$consumes[0];
-        if (!in_array($inputFormat, $consumes)) {
-            // We can't consume the content that the client is sending us
-            return new Response('', 415);
-        }
+        $consumes = [
+            
+        ];
 
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-
-        // Read out all input parameter values into variables
-        $body = $request->getContent();
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $body = $this->deserialize($body, 'Swagger\Server\Model\Order', $inputFormat);
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\Type("Swagger\Server\Model\Order");
-        $response = $this->validate($body, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            $contentType = $request->headers->has('Content-Type') ? $request->headers->get('Content-Type') : $consumes[0];
+            $requestFormat = $this->getOutputFormat($contentType, $consumes);
+            if ($requestFormat === null) {
+                // We can't consume the content that the client is sending us
+                throw new RequestFormatNotSupportedException();
+            }
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+
+            // Read out all input parameter values into variables
+            $body = $request->getContent();
+
+            // Deserialize the input values that needs it
+            $body = $this->deserialize($body, 'Swagger\Server\Model\Order', $requestFormat);
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts = null;
+            $errors = $this->validate($body, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('body', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             
             // Make the call to the business logic
             $responseCode = 200;
             $responseHeaders = [];
-            $result = $handler->placeOrder($body, $responseCode, $responseHeaders);
+            $response = $handler->placeOrder($body, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = 'successful operation';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 200:
-                    $message = 'successful operation';
-                    break;
-                case 400:
-                    $message = 'Invalid Order';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'placeOrder');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'placeOrder');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'placeOrder');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'StoreController::placeOrder']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'placeOrder');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'StoreController::placeOrder']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'placeOrder');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'StoreController::placeOrder']);
+            return $responseObject;
         }
     }
 

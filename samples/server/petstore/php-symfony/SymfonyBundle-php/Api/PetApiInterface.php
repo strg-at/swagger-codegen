@@ -70,10 +70,10 @@ interface PetApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return void
+     * @return 
      *
      */
-    public function addPet(Pet $body, &$responseCode, array &$responseHeaders);
+    public function addPet(Pet $body, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation deletePet
@@ -85,10 +85,10 @@ interface PetApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return void
+     * @return 
      *
      */
-    public function deletePet($petId, $apiKey = null, &$responseCode, array &$responseHeaders);
+    public function deletePet(int $petId, string $apiKey = null, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation findPetsByStatus
@@ -99,10 +99,10 @@ interface PetApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return Swagger\Server\Model\Pet[]
+     * @return \Swagger\Server\Model\Pet
      *
      */
-    public function findPetsByStatus(array $status, &$responseCode, array &$responseHeaders);
+    public function findPetsByStatus(array $status, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation findPetsByTags
@@ -113,10 +113,10 @@ interface PetApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return Swagger\Server\Model\Pet[]
+     * @return \Swagger\Server\Model\Pet
      *
      */
-    public function findPetsByTags(array $tags, &$responseCode, array &$responseHeaders);
+    public function findPetsByTags(array $tags, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation getPetById
@@ -127,10 +127,10 @@ interface PetApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return Swagger\Server\Model\Pet[]
+     * @return \Swagger\Server\Model\Pet
      *
      */
-    public function getPetById($petId, &$responseCode, array &$responseHeaders);
+    public function getPetById(int $petId, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation updatePet
@@ -141,10 +141,10 @@ interface PetApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return void
+     * @return 
      *
      */
-    public function updatePet(Pet $body, &$responseCode, array &$responseHeaders);
+    public function updatePet(Pet $body, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation updatePetWithForm
@@ -157,10 +157,10 @@ interface PetApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return void
+     * @return 
      *
      */
-    public function updatePetWithForm($petId, $name = null, $status = null, &$responseCode, array &$responseHeaders);
+    public function updatePetWithForm(int $petId, string $name = null, string $status = null, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation uploadFile
@@ -173,8 +173,17 @@ interface PetApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return Swagger\Server\Model\ApiResponse[]
+     * @return \Swagger\Server\Model\ApiResponse
      *
      */
-    public function uploadFile($petId, $additionalMetadata = null, UploadedFile $file = null, &$responseCode, array &$responseHeaders);
+    public function uploadFile(int $petId, string $additionalMetadata = null, UploadedFile $file = null, &$responseCode = 200, array &$responseHeaders = []);
+
+    /**
+     * @param int $status The http status the error response reflects.
+     * @param array<string> $messages The messages for the error response.
+     * @param string $operationId The operationId of the api entry point.
+     * @return \Swagger\Server\Model\ApiResponse|Swagger\Server\Model\Pet[]|\Swagger\Server\Model\Pet
+     */
+    public function createErrorResponse($status, $messages, $operationId);
+
 }

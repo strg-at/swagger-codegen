@@ -52,7 +52,7 @@ class Pet
     protected $id;
 
     /**
-     * @var Swagger\Server\Model\Category|null
+     * @var \Swagger\Server\Model\Category|null
      * @SerializedName("category")
      * @Assert\Type("Swagger\Server\Model\Category")
      * @Type("Swagger\Server\Model\Category")
@@ -80,7 +80,7 @@ class Pet
     protected $photoUrls;
 
     /**
-     * @var Swagger\Server\Model\Tag[]|null
+     * @var \Swagger\Server\Model\Tag[]|null
      * @SerializedName("tags")
      * @Assert\All({
      *   @Assert\Type("Swagger\Server\Model\Tag")
@@ -131,7 +131,7 @@ class Pet
      *
      * @return $this
      */
-    public function setId($id = null)
+    public function setId(int $id = null)
     {
         $this->id = $id;
 
@@ -141,7 +141,7 @@ class Pet
     /**
      * Gets category.
      *
-     * @return Swagger\Server\Model\Category|null
+     * @return \Swagger\Server\Model\Category|null
      */
     public function getCategory()
     {
@@ -151,11 +151,11 @@ class Pet
     /**
      * Sets category.
      *
-     * @param Swagger\Server\Model\Category|null $category
+     * @param \Swagger\Server\Model\Category|null $category
      *
      * @return $this
      */
-    public function setCategory(Category $category = null)
+    public function setCategory($category = null)
     {
         $this->category = $category;
 
@@ -179,7 +179,7 @@ class Pet
      *
      * @return $this
      */
-    public function setName($name)
+    public function setName(string $name)
     {
         $this->name = $name;
 
@@ -203,7 +203,7 @@ class Pet
      *
      * @return $this
      */
-    public function setPhotoUrls($photoUrls)
+    public function setPhotoUrls(array $photoUrls)
     {
         $this->photoUrls = $photoUrls;
 
@@ -213,7 +213,7 @@ class Pet
     /**
      * Gets tags.
      *
-     * @return Swagger\Server\Model\Tag[]|null
+     * @return \Swagger\Server\Model\Tag[]|null
      */
     public function getTags()
     {
@@ -223,11 +223,11 @@ class Pet
     /**
      * Sets tags.
      *
-     * @param Swagger\Server\Model\Tag[]|null $tags
+     * @param \Swagger\Server\Model\Tag[]|null $tags
      *
      * @return $this
      */
-    public function setTags(Tag $tags = null)
+    public function setTags(array $tags = null)
     {
         $this->tags = $tags;
 
@@ -251,7 +251,7 @@ class Pet
      *
      * @return $this
      */
-    public function setStatus($status = null)
+    public function setStatus(string $status = null)
     {
         $this->status = $status;
 

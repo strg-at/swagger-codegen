@@ -86,7 +86,7 @@ class Tag
      *
      * @return $this
      */
-    public function setId($id = null)
+    public function setId(int $id = null)
     {
         $this->id = $id;
 
@@ -110,7 +110,7 @@ class Tag
      *
      * @return $this
      */
-    public function setName($name = null)
+    public function setName(string $name = null)
     {
         $this->name = $name;
 

@@ -60,10 +60,10 @@ interface StoreApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return void
+     * @return 
      *
      */
-    public function deleteOrder($orderId, &$responseCode, array &$responseHeaders);
+    public function deleteOrder(string $orderId, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation getInventory
@@ -73,10 +73,10 @@ interface StoreApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return int
+     * @return 
      *
      */
-    public function getInventory(&$responseCode, array &$responseHeaders);
+    public function getInventory(&$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation getOrderById
@@ -87,10 +87,10 @@ interface StoreApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return Swagger\Server\Model\Order[]
+     * @return \Swagger\Server\Model\Order
      *
      */
-    public function getOrderById($orderId, &$responseCode, array &$responseHeaders);
+    public function getOrderById(int $orderId, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation placeOrder
@@ -101,8 +101,17 @@ interface StoreApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return Swagger\Server\Model\Order[]
+     * @return \Swagger\Server\Model\Order
      *
      */
-    public function placeOrder(Order $body, &$responseCode, array &$responseHeaders);
+    public function placeOrder(Order $body, &$responseCode = 200, array &$responseHeaders = []);
+
+    /**
+     * @param int $status The http status the error response reflects.
+     * @param array<string> $messages The messages for the error response.
+     * @param string $operationId The operationId of the api entry point.
+     * @return \Swagger\Server\Model\Order|int
+     */
+    public function createErrorResponse($status, $messages, $operationId);
+
 }

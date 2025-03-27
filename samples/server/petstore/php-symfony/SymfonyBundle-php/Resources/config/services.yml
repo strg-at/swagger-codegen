@@ -7,36 +7,44 @@ parameters:
     swagger_server.validator:  'Swagger\Server\Service\SymfonyValidator'
 
 services:
+    _defaults:
+        autowire: true
+        autoconfigure: false
+        public: false
+        bind:
+            $container: '@service_container'
+            $logger: '@logger'
+            $serializer: '@swagger_server.service.serializer'
+            $validator: '@swagger_server.service.validator'
+            $apiServer: '@swagger_server.api.api_server'
+
+    Symfony\Component\DependencyInjection\ContainerInterface: '@service_container'
+
+    Psr\Container\ContainerInterface: '@service_container'
+
     swagger_server.api.api_server:
         class: Swagger\Server\Api\ApiServer
 
     swagger_server.model.model_serializer:
         class: Swagger\Server\Model\ModelSerializer
 
-    swagger_server.service.serializer:
-        class: %swagger_server.serializer%
-
     swagger_server.service.validator:
-        class: %swagger_server.validator%
+        class: "%swagger_server.validator%"
+
+    swagger_server.service.serializer:
+        class: "%swagger_server.serializer%"
+        arguments:
+            $container: '@service_container'
 
     swagger_server.controller.pet:
         class: Swagger\Server\Controller\PetController
-        calls:
-         - [setSerializer, ['@swagger_server.service.serializer']]
-         - [setValidator,  ['@swagger_server.service.validator']]
-         - [setApiServer,  ['@swagger_server.api.api_server']]
+        public: true
 
     swagger_server.controller.store:
         class: Swagger\Server\Controller\StoreController
-        calls:
-         - [setSerializer, ['@swagger_server.service.serializer']]
-         - [setValidator,  ['@swagger_server.service.validator']]
-         - [setApiServer,  ['@swagger_server.api.api_server']]
+        public: true
 
     swagger_server.controller.user:
         class: Swagger\Server\Controller\UserController
-        calls:
-         - [setSerializer, ['@swagger_server.service.serializer']]
-         - [setValidator,  ['@swagger_server.service.validator']]
-         - [setApiServer,  ['@swagger_server.api.api_server']]
+        public: true
 

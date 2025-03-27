@@ -35,6 +35,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Validator\Constraints as Assert;
 use Swagger\Server\Api\UserApiInterface;
+use Psr\Log\LoggerInterface;
 use Swagger\Server\Model\User;
 
 /**
@@ -58,75 +59,134 @@ class UserController extends Controller
      */
     public function createUserAction(Request $request)
     {
+        $this->logger->info($request, ['operation' => 'UserController::createUser']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            0 => [
+                'message' => 'successful operation',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
         // Make sure that the client is providing something that we can consume
-        $consumes = [];
-        $inputFormat = $request->headers->has('Content-Type')?$request->headers->get('Content-Type'):$consumes[0];
-        if (!in_array($inputFormat, $consumes)) {
-            // We can't consume the content that the client is sending us
-            return new Response('', 415);
-        }
+        $consumes = [
+            
+        ];
 
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-
-        // Read out all input parameter values into variables
-        $body = $request->getContent();
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $body = $this->deserialize($body, 'Swagger\Server\Model\User', $inputFormat);
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\Type("Swagger\Server\Model\User");
-        $response = $this->validate($body, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            $contentType = $request->headers->has('Content-Type') ? $request->headers->get('Content-Type') : $consumes[0];
+            $requestFormat = $this->getOutputFormat($contentType, $consumes);
+            if ($requestFormat === null) {
+                // We can't consume the content that the client is sending us
+                throw new RequestFormatNotSupportedException();
+            }
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+
+            // Read out all input parameter values into variables
+            $body = $request->getContent();
+
+            // Deserialize the input values that needs it
+            $body = $this->deserialize($body, 'Swagger\Server\Model\User', $requestFormat);
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts = null;
+            $errors = $this->validate($body, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('body', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             
             // Make the call to the business logic
             $responseCode = 204;
             $responseHeaders = [];
-            $result = $handler->createUser($body, $responseCode, $responseHeaders);
+            $response = $handler->createUser($body, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = 'successful operation';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 0:
-                    $message = 'successful operation';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'createUser');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'createUser');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'createUser');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'UserController::createUser']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'createUser');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'UserController::createUser']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'createUser');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'UserController::createUser']);
+            return $responseObject;
         }
     }
 
@@ -140,77 +200,136 @@ class UserController extends Controller
      */
     public function createUsersWithArrayInputAction(Request $request)
     {
+        $this->logger->info($request, ['operation' => 'UserController::createUsersWithArrayInput']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            0 => [
+                'message' => 'successful operation',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
         // Make sure that the client is providing something that we can consume
-        $consumes = [];
-        $inputFormat = $request->headers->has('Content-Type')?$request->headers->get('Content-Type'):$consumes[0];
-        if (!in_array($inputFormat, $consumes)) {
-            // We can't consume the content that the client is sending us
-            return new Response('', 415);
-        }
+        $consumes = [
+            
+        ];
 
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-
-        // Read out all input parameter values into variables
-        $body = $request->getContent();
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $body = $this->deserialize($body, 'array<Swagger\Server\Model\User>', $inputFormat);
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\All([
-            new Assert\Type("Swagger\Server\Model\User")
-        ]);
-        $response = $this->validate($body, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            $contentType = $request->headers->has('Content-Type') ? $request->headers->get('Content-Type') : $consumes[0];
+            $requestFormat = $this->getOutputFormat($contentType, $consumes);
+            if ($requestFormat === null) {
+                // We can't consume the content that the client is sending us
+                throw new RequestFormatNotSupportedException();
+            }
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+
+            // Read out all input parameter values into variables
+            $body = $request->getContent();
+
+            // Deserialize the input values that needs it
+            $body = $this->deserialize($body, 'array<Swagger\Server\Model\User>', $requestFormat);
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts[] = new Assert\All([
+                new Assert\Type("Swagger\Server\Model\User")
+            ]);
+            $errors = $this->validate($body, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('body', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             
             // Make the call to the business logic
             $responseCode = 204;
             $responseHeaders = [];
-            $result = $handler->createUsersWithArrayInput($body, $responseCode, $responseHeaders);
+            $response = $handler->createUsersWithArrayInput($body, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = 'successful operation';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 0:
-                    $message = 'successful operation';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'createUsersWithArrayInput');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'createUsersWithArrayInput');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'createUsersWithArrayInput');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'UserController::createUsersWithArrayInput']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'createUsersWithArrayInput');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'UserController::createUsersWithArrayInput']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'createUsersWithArrayInput');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'UserController::createUsersWithArrayInput']);
+            return $responseObject;
         }
     }
 
@@ -224,77 +343,136 @@ class UserController extends Controller
      */
     public function createUsersWithListInputAction(Request $request)
     {
+        $this->logger->info($request, ['operation' => 'UserController::createUsersWithListInput']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            0 => [
+                'message' => 'successful operation',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
         // Make sure that the client is providing something that we can consume
-        $consumes = [];
-        $inputFormat = $request->headers->has('Content-Type')?$request->headers->get('Content-Type'):$consumes[0];
-        if (!in_array($inputFormat, $consumes)) {
-            // We can't consume the content that the client is sending us
-            return new Response('', 415);
-        }
+        $consumes = [
+            
+        ];
 
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-
-        // Read out all input parameter values into variables
-        $body = $request->getContent();
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $body = $this->deserialize($body, 'array<Swagger\Server\Model\User>', $inputFormat);
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\All([
-            new Assert\Type("Swagger\Server\Model\User")
-        ]);
-        $response = $this->validate($body, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            $contentType = $request->headers->has('Content-Type') ? $request->headers->get('Content-Type') : $consumes[0];
+            $requestFormat = $this->getOutputFormat($contentType, $consumes);
+            if ($requestFormat === null) {
+                // We can't consume the content that the client is sending us
+                throw new RequestFormatNotSupportedException();
+            }
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+
+            // Read out all input parameter values into variables
+            $body = $request->getContent();
+
+            // Deserialize the input values that needs it
+            $body = $this->deserialize($body, 'array<Swagger\Server\Model\User>', $requestFormat);
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts[] = new Assert\All([
+                new Assert\Type("Swagger\Server\Model\User")
+            ]);
+            $errors = $this->validate($body, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('body', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             
             // Make the call to the business logic
             $responseCode = 204;
             $responseHeaders = [];
-            $result = $handler->createUsersWithListInput($body, $responseCode, $responseHeaders);
+            $response = $handler->createUsersWithListInput($body, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = 'successful operation';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 0:
-                    $message = 'successful operation';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'createUsersWithListInput');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'createUsersWithListInput');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'createUsersWithListInput');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'UserController::createUsersWithListInput']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'createUsersWithListInput');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'UserController::createUsersWithListInput']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'createUsersWithListInput');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'UserController::createUsersWithListInput']);
+            return $responseObject;
         }
     }
 
@@ -308,69 +486,129 @@ class UserController extends Controller
      */
     public function deleteUserAction(Request $request, $username)
     {
+        $this->logger->info($request, ['operation' => 'UserController::deleteUser']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            400 => [
+                'message' => 'Invalid username supplied',
+                'responseType' => '',
+            ],
+            404 => [
+                'message' => 'User not found',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
+        
+
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-
-        // Read out all input parameter values into variables
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $username = $this->deserialize($username, 'string', 'string');
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\Type("string");
-        $response = $this->validate($username, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+
+            // Read out all input parameter values into variables
+
+            // Deserialize the input values that needs it
+            $username = $this->deserialize($username, 'string', 'string');
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts[] = new Assert\Type("string");
+            $errors = $this->validate($username, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('username', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             
             // Make the call to the business logic
             $responseCode = 204;
             $responseHeaders = [];
-            $result = $handler->deleteUser($username, $responseCode, $responseHeaders);
+            $response = $handler->deleteUser($username, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = '';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 400:
-                    $message = 'Invalid username supplied';
-                    break;
-                case 404:
-                    $message = 'User not found';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'deleteUser');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'deleteUser');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'deleteUser');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'UserController::deleteUser']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'deleteUser');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'UserController::deleteUser']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'deleteUser');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'UserController::deleteUser']);
+            return $responseObject;
         }
     }
 
@@ -384,72 +622,133 @@ class UserController extends Controller
      */
     public function getUserByNameAction(Request $request, $username)
     {
+        $this->logger->info($request, ['operation' => 'UserController::getUserByName']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            200 => [
+                'message' => 'successful operation',
+                'responseType' => 'Swagger\Server\Model\User',
+            ],
+            400 => [
+                'message' => 'Invalid username supplied',
+                'responseType' => '',
+            ],
+            404 => [
+                'message' => 'User not found',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
+        
+
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-
-        // Read out all input parameter values into variables
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $username = $this->deserialize($username, 'string', 'string');
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\Type("string");
-        $response = $this->validate($username, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+
+            // Read out all input parameter values into variables
+
+            // Deserialize the input values that needs it
+            $username = $this->deserialize($username, 'string', 'string');
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts[] = new Assert\Type("string");
+            $errors = $this->validate($username, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('username', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             
             // Make the call to the business logic
             $responseCode = 200;
             $responseHeaders = [];
-            $result = $handler->getUserByName($username, $responseCode, $responseHeaders);
+            $response = $handler->getUserByName($username, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = 'successful operation';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 200:
-                    $message = 'successful operation';
-                    break;
-                case 400:
-                    $message = 'Invalid username supplied';
-                    break;
-                case 404:
-                    $message = 'User not found';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'getUserByName');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'getUserByName');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'getUserByName');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'UserController::getUserByName']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'getUserByName');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'UserController::getUserByName']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'getUserByName');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'UserController::getUserByName']);
+            return $responseObject;
         }
     }
 
@@ -463,79 +762,142 @@ class UserController extends Controller
      */
     public function loginUserAction(Request $request)
     {
+        $this->logger->info($request, ['operation' => 'UserController::loginUser']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            200 => [
+                'message' => 'successful operation',
+                'responseType' => 'string',
+            ],
+            400 => [
+                'message' => 'Invalid username/password supplied',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
+        
+
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-
-        // Read out all input parameter values into variables
-        $username = $request->query->get('username');
-        $password = $request->query->get('password');
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $username = $this->deserialize($username, 'string', 'string');
-        $password = $this->deserialize($password, 'string', 'string');
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\Type("string");
-        $response = $this->validate($username, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\Type("string");
-        $response = $this->validate($password, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+
+            // Read out all input parameter values into variables
+            $username = $request->query->get('username');
+            $password = $request->query->get('password');
+
+            // Deserialize the input values that needs it
+            $username = $this->deserialize($username, 'string', 'string');
+            $password = $this->deserialize($password, 'string', 'string');
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts[] = new Assert\Type("string");
+            $errors = $this->validate($username, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('username', $errors)
+                );
+            }
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts[] = new Assert\Type("string");
+            $errors = $this->validate($password, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('password', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             
             // Make the call to the business logic
             $responseCode = 200;
             $responseHeaders = [];
-            $result = $handler->loginUser($username, $password, $responseCode, $responseHeaders);
+            $response = $handler->loginUser($username, $password, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = 'successful operation';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 200:
-                    $message = 'successful operation';
-                    break;
-                case 400:
-                    $message = 'Invalid username/password supplied';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'loginUser');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'loginUser');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'loginUser');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'UserController::loginUser']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'loginUser');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'UserController::loginUser']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'loginUser');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'UserController::loginUser']);
+            return $responseObject;
         }
     }
 
@@ -549,58 +911,114 @@ class UserController extends Controller
      */
     public function logoutUserAction(Request $request)
     {
+        $this->logger->info($request, ['operation' => 'UserController::logoutUser']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            0 => [
+                'message' => 'successful operation',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
+        
+
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-
-        // Read out all input parameter values into variables
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-
-        // Validate the input values
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+
+            // Read out all input parameter values into variables
+
+            // Deserialize the input values that needs it
+
+            // Validate the input values
+            $validationMessages = [];
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             
             // Make the call to the business logic
             $responseCode = 204;
             $responseHeaders = [];
-            $result = $handler->logoutUser($responseCode, $responseHeaders);
+            $response = $handler->logoutUser($responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = 'successful operation';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 0:
-                    $message = 'successful operation';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'logoutUser');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'logoutUser');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'logoutUser');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'UserController::logoutUser']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'logoutUser');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'UserController::logoutUser']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'logoutUser');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'UserController::logoutUser']);
+            return $responseObject;
         }
     }
 
@@ -614,86 +1032,149 @@ class UserController extends Controller
      */
     public function updateUserAction(Request $request, $username)
     {
+        $this->logger->info($request, ['operation' => 'UserController::updateUser']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            400 => [
+                'message' => 'Invalid user supplied',
+                'responseType' => '',
+            ],
+            404 => [
+                'message' => 'User not found',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
         // Make sure that the client is providing something that we can consume
-        $consumes = [];
-        $inputFormat = $request->headers->has('Content-Type')?$request->headers->get('Content-Type'):$consumes[0];
-        if (!in_array($inputFormat, $consumes)) {
-            // We can't consume the content that the client is sending us
-            return new Response('', 415);
-        }
+        $consumes = [
+            
+        ];
 
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-
-        // Read out all input parameter values into variables
-        $body = $request->getContent();
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $username = $this->deserialize($username, 'string', 'string');
-        $body = $this->deserialize($body, 'Swagger\Server\Model\User', $inputFormat);
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\Type("string");
-        $response = $this->validate($username, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\Type("Swagger\Server\Model\User");
-        $response = $this->validate($body, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            $contentType = $request->headers->has('Content-Type') ? $request->headers->get('Content-Type') : $consumes[0];
+            $requestFormat = $this->getOutputFormat($contentType, $consumes);
+            if ($requestFormat === null) {
+                // We can't consume the content that the client is sending us
+                throw new RequestFormatNotSupportedException();
+            }
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+
+            // Read out all input parameter values into variables
+            $body = $request->getContent();
+
+            // Deserialize the input values that needs it
+            $username = $this->deserialize($username, 'string', 'string');
+            $body = $this->deserialize($body, 'Swagger\Server\Model\User', $requestFormat);
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts[] = new Assert\Type("string");
+            $errors = $this->validate($username, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('username', $errors)
+                );
+            }
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts = null;
+            $errors = $this->validate($body, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('body', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             
             // Make the call to the business logic
             $responseCode = 204;
             $responseHeaders = [];
-            $result = $handler->updateUser($username, $body, $responseCode, $responseHeaders);
+            $response = $handler->updateUser($username, $body, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = '';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 400:
-                    $message = 'Invalid user supplied';
-                    break;
-                case 404:
-                    $message = 'User not found';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'updateUser');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'updateUser');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'updateUser');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'UserController::updateUser']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'updateUser');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'UserController::updateUser']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'updateUser');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'UserController::updateUser']);
+            return $responseObject;
         }
     }
 
