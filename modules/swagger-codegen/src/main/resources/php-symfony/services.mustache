@@ -11,6 +11,16 @@ services:
         autowire: true
         autoconfigure: false
         public: false
+        bind:
+            $container: '@service_container'
+            $logger: '@logger'
+            $serializer: '@{{bundleAlias}}.service.serializer'
+            $validator: '@{{bundleAlias}}.service.validator'
+            $apiServer: '@{{bundleAlias}}.api.api_server'
+
+    Symfony\Component\DependencyInjection\ContainerInterface: '@service_container'
+
+    Psr\Container\ContainerInterface: '@service_container'
 
     {{bundleAlias}}.api.api_server:
         class: {{apiPackage}}\ApiServer
@@ -18,8 +28,13 @@ services:
     {{bundleAlias}}.model.model_serializer:
         class: {{modelPackage}}\ModelSerializer
 
+    {{bundleAlias}}.service.validator:
+        class: "%{{bundleAlias}}.validator%"
+
     {{bundleAlias}}.service.serializer:
         class: "%{{bundleAlias}}.serializer%"
+        arguments:
+            $container: '@service_container'
 
 {{#apiInfo}}
 {{#apis}}
@@ -27,9 +42,6 @@ services:
     {{bundleAlias}}.controller.{{pathPrefix}}:
         class: {{controllerPackage}}\{{baseName}}Controller
         public: true
-        calls:
-         - [setSerializer, ['@{{bundleAlias}}.service.serializer']]
-         - [setApiServer,  ['@{{bundleAlias}}.api.api_server']]
 
 {{/operations}}
 {{/apis}}
