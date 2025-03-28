@@ -68,7 +68,7 @@ class Order
     protected $quantity;
 
     /**
-     * @var \DateTime|null
+     * @var \\DateTime|null
      * @SerializedName("shipDate")
      * @Assert\DateTime()
      * @Type("DateTime")
@@ -98,7 +98,7 @@ class Order
      * Constructor
      * @param mixed[] $data Associated array of property values initializing the model
      */
-    public function __construct(array $data = null)
+    public function __construct(?array $data = null)
     {
         $this->id = isset($data['id']) ? $data['id'] : null;
         $this->petId = isset($data['petId']) ? $data['petId'] : null;
@@ -125,7 +125,7 @@ class Order
      *
      * @return $this
      */
-    public function setId($id = null)
+    public function setId(int $id = null)
     {
         $this->id = $id;
 
@@ -149,7 +149,7 @@ class Order
      *
      * @return $this
      */
-    public function setPetId($petId = null)
+    public function setPetId(int $petId = null)
     {
         $this->petId = $petId;
 
@@ -173,7 +173,7 @@ class Order
      *
      * @return $this
      */
-    public function setQuantity($quantity = null)
+    public function setQuantity(int $quantity = null)
     {
         $this->quantity = $quantity;
 
@@ -183,7 +183,7 @@ class Order
     /**
      * Gets shipDate.
      *
-     * @return \DateTime|null
+     * @return \\DateTime|null
      */
     public function getShipDate()
     {
@@ -193,7 +193,7 @@ class Order
     /**
      * Sets shipDate.
      *
-     * @param \DateTime|null $shipDate
+     * @param \\DateTime|null $shipDate
      *
      * @return $this
      */
@@ -221,7 +221,7 @@ class Order
      *
      * @return $this
      */
-    public function setStatus($status = null)
+    public function setStatus(string $status = null)
     {
         $this->status = $status;
 
@@ -245,7 +245,7 @@ class Order
      *
      * @return $this
      */
-    public function setComplete($complete = null)
+    public function setComplete(bool $complete = null)
     {
         $this->complete = $complete;
 

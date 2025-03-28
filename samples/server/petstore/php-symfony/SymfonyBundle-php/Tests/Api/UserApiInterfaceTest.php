@@ -48,28 +48,28 @@ class UserApiInterfaceTest extends WebTestCase
     /**
      * Setup before running any test cases
      */
-    public static function setUpBeforeClass()
+    public static function setUpBeforeClass(): void
     {
     }
 
     /**
      * Setup before running each test case
      */
-    public function setUp()
+    public function setUp(): void
     {
     }
 
     /**
      * Clean up after running each test case
      */
-    public function tearDown()
+    public function tearDown(): void
     {
     }
 
     /**
      * Clean up after running all test cases
      */
-    public static function tearDownAfterClass()
+    public static function tearDownAfterClass(): void
     {
     }
 
@@ -79,7 +79,7 @@ class UserApiInterfaceTest extends WebTestCase
      * Create user.
      *
      */
-    public function testCreateUser()
+    public function testCreateUser(): void
     {
         $client = static::createClient();
 
@@ -94,7 +94,7 @@ class UserApiInterfaceTest extends WebTestCase
      * Creates list of users with given input array.
      *
      */
-    public function testCreateUsersWithArrayInput()
+    public function testCreateUsersWithArrayInput(): void
     {
         $client = static::createClient();
 
@@ -109,7 +109,7 @@ class UserApiInterfaceTest extends WebTestCase
      * Creates list of users with given input array.
      *
      */
-    public function testCreateUsersWithListInput()
+    public function testCreateUsersWithListInput(): void
     {
         $client = static::createClient();
 
@@ -124,7 +124,7 @@ class UserApiInterfaceTest extends WebTestCase
      * Delete user.
      *
      */
-    public function testDeleteUser()
+    public function testDeleteUser(): void
     {
         $client = static::createClient();
 
@@ -142,7 +142,7 @@ class UserApiInterfaceTest extends WebTestCase
      * Get user by user name.
      *
      */
-    public function testGetUserByName()
+    public function testGetUserByName(): void
     {
         $client = static::createClient();
 
@@ -160,7 +160,7 @@ class UserApiInterfaceTest extends WebTestCase
      * Logs user into the system.
      *
      */
-    public function testLoginUser()
+    public function testLoginUser(): void
     {
         $client = static::createClient();
 
@@ -175,7 +175,7 @@ class UserApiInterfaceTest extends WebTestCase
      * Logs out current logged in user session.
      *
      */
-    public function testLogoutUser()
+    public function testLogoutUser(): void
     {
         $client = static::createClient();
 
@@ -190,7 +190,7 @@ class UserApiInterfaceTest extends WebTestCase
      * Updated user.
      *
      */
-    public function testUpdateUser()
+    public function testUpdateUser(): void
     {
         $client = static::createClient();
 
@@ -202,7 +202,7 @@ class UserApiInterfaceTest extends WebTestCase
         $crawler = $client->request('PUT', $path);
     }
 
-    protected function genTestData($regexp)
+    protected function genTestData($regexp): mixed
     {
         $grammar  = new \Hoa\File\Read('hoa://Library/Regex/Grammar.pp');
         $compiler = \Hoa\Compiler\Llk\Llk::load($grammar);

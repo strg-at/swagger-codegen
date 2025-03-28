@@ -51,10 +51,10 @@ interface UserApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return void
+     * @return 
      *
      */
-    public function createUser(User $body, &$responseCode, array &$responseHeaders);
+    public function createUser(User $body, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation createUsersWithArrayInput
@@ -65,10 +65,10 @@ interface UserApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return void
+     * @return 
      *
      */
-    public function createUsersWithArrayInput(array $body, &$responseCode, array &$responseHeaders);
+    public function createUsersWithArrayInput(array $body, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation createUsersWithListInput
@@ -79,10 +79,10 @@ interface UserApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return void
+     * @return 
      *
      */
-    public function createUsersWithListInput(array $body, &$responseCode, array &$responseHeaders);
+    public function createUsersWithListInput(array $body, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation deleteUser
@@ -93,10 +93,10 @@ interface UserApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return void
+     * @return 
      *
      */
-    public function deleteUser($username, &$responseCode, array &$responseHeaders);
+    public function deleteUser(string $username, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation getUserByName
@@ -107,10 +107,10 @@ interface UserApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return Swagger\Server\Model\User[]
+     * @return \Swagger\Server\Model\User
      *
      */
-    public function getUserByName($username, &$responseCode, array &$responseHeaders);
+    public function getUserByName(string $username, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation loginUser
@@ -122,10 +122,10 @@ interface UserApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return string
+     * @return 
      *
      */
-    public function loginUser($username, $password, &$responseCode, array &$responseHeaders);
+    public function loginUser(string $username, string $password, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation logoutUser
@@ -135,10 +135,10 @@ interface UserApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return void
+     * @return 
      *
      */
-    public function logoutUser(&$responseCode, array &$responseHeaders);
+    public function logoutUser(&$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation updateUser
@@ -150,8 +150,17 @@ interface UserApiInterface
      * @param  integer $responseCode     The HTTP response code to return
      * @param  array   $responseHeaders  Additional HTTP headers to return with the response ()
      *
-     * @return void
+     * @return 
      *
      */
-    public function updateUser($username, User $body, &$responseCode, array &$responseHeaders);
+    public function updateUser(string $username, User $body, &$responseCode = 200, array &$responseHeaders = []);
+
+    /**
+     * @param int $status The http status the error response reflects.
+     * @param array<string> $messages The messages for the error response.
+     * @param string $operationId The operationId of the api entry point.
+     * @return string|\Swagger\Server\Model\User
+     */
+    public function createErrorResponse($status, $messages, $operationId);
+
 }

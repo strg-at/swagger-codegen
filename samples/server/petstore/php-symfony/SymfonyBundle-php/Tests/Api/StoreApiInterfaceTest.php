@@ -48,28 +48,28 @@ class StoreApiInterfaceTest extends WebTestCase
     /**
      * Setup before running any test cases
      */
-    public static function setUpBeforeClass()
+    public static function setUpBeforeClass(): void
     {
     }
 
     /**
      * Setup before running each test case
      */
-    public function setUp()
+    public function setUp(): void
     {
     }
 
     /**
      * Clean up after running each test case
      */
-    public function tearDown()
+    public function tearDown(): void
     {
     }
 
     /**
      * Clean up after running all test cases
      */
-    public static function tearDownAfterClass()
+    public static function tearDownAfterClass(): void
     {
     }
 
@@ -79,7 +79,7 @@ class StoreApiInterfaceTest extends WebTestCase
      * Delete purchase order by ID.
      *
      */
-    public function testDeleteOrder()
+    public function testDeleteOrder(): void
     {
         $client = static::createClient();
 
@@ -97,7 +97,7 @@ class StoreApiInterfaceTest extends WebTestCase
      * Returns pet inventories by status.
      *
      */
-    public function testGetInventory()
+    public function testGetInventory(): void
     {
         $client = static::createClient();
 
@@ -112,7 +112,7 @@ class StoreApiInterfaceTest extends WebTestCase
      * Find purchase order by ID.
      *
      */
-    public function testGetOrderById()
+    public function testGetOrderById(): void
     {
         $client = static::createClient();
 
@@ -130,7 +130,7 @@ class StoreApiInterfaceTest extends WebTestCase
      * Place an order for a pet.
      *
      */
-    public function testPlaceOrder()
+    public function testPlaceOrder(): void
     {
         $client = static::createClient();
 
@@ -139,7 +139,7 @@ class StoreApiInterfaceTest extends WebTestCase
         $crawler = $client->request('POST', $path);
     }
 
-    protected function genTestData($regexp)
+    protected function genTestData($regexp): mixed
     {
         $grammar  = new \Hoa\File\Read('hoa://Library/Regex/Grammar.pp');
         $compiler = \Hoa\Compiler\Llk\Llk::load($grammar);

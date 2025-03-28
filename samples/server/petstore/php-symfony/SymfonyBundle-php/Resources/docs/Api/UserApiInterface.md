@@ -212,7 +212,7 @@ class UserApi implements UserApiInterface
     /**
      * Implementation of UserApiInterface#deleteUser
      */
-    public function deleteUser($username)
+    public function deleteUser(string $username)
     {
         // Implement the operation ...
     }
@@ -266,7 +266,7 @@ class UserApi implements UserApiInterface
     /**
      * Implementation of UserApiInterface#getUserByName
      */
-    public function getUserByName($username)
+    public function getUserByName(string $username)
     {
         // Implement the operation ...
     }
@@ -320,7 +320,7 @@ class UserApi implements UserApiInterface
     /**
      * Implementation of UserApiInterface#loginUser
      */
-    public function loginUser($username, $password)
+    public function loginUser(string $username, string $password)
     {
         // Implement the operation ...
     }
@@ -426,7 +426,7 @@ class UserApi implements UserApiInterface
     /**
      * Implementation of UserApiInterface#updateUser
      */
-    public function updateUser($username, User $body)
+    public function updateUser(string $username, User $body)
     {
         // Implement the operation ...
     }

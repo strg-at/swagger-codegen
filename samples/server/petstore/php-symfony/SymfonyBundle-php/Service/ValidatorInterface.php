@@ -17,7 +17,7 @@ interface ValidatorInterface
      *                                             validate. If none is given,
      *                                             "Default" is assumed
      *
-     * @return ConstraintViolationListInterface A list of constraint violations
+     * @return \Symfony\Component\Validator\ConstraintViolationListInterface A list of constraint violations
      *                                          If the list is empty, validation
      *                                          succeeded
      */

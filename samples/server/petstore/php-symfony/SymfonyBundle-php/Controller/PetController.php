@@ -35,6 +35,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Validator\Constraints as Assert;
 use Swagger\Server\Api\PetApiInterface;
+use Psr\Log\LoggerInterface;
 use Swagger\Server\Model\ApiResponse;
 use Swagger\Server\Model\Pet;
 
@@ -59,48 +60,73 @@ class PetController extends Controller
      */
     public function addPetAction(Request $request)
     {
+        $this->logger->info($request, ['operation' => 'PetController::addPet']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            405 => [
+                'message' => 'Invalid input',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
         // Make sure that the client is providing something that we can consume
-        $consumes = ['application/json', 'application/xml'];
-        $inputFormat = $request->headers->has('Content-Type')?$request->headers->get('Content-Type'):$consumes[0];
-        if (!in_array($inputFormat, $consumes)) {
-            // We can't consume the content that the client is sending us
-            return new Response('', 415);
-        }
+        $consumes = [
+            'application/json','application/xml',
+        ];
 
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-        // Authentication 'petstore_auth' required
-        // Oauth required
-        $securitypetstore_auth = $request->headers->get('authorization');
-
-        // Read out all input parameter values into variables
-        $body = $request->getContent();
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $body = $this->deserialize($body, 'Swagger\Server\Model\Pet', $inputFormat);
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\Type("Swagger\Server\Model\Pet");
-        $response = $this->validate($body, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            $contentType = $request->headers->has('Content-Type') ? $request->headers->get('Content-Type') : $consumes[0];
+            $requestFormat = $this->getOutputFormat($contentType, $consumes);
+            if ($requestFormat === null) {
+                // We can't consume the content that the client is sending us
+                throw new RequestFormatNotSupportedException();
+            }
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+            // Authentication 'petstore_auth' required
+            // Oauth required
+            $securitypetstore_auth = $request->headers->get('authorization');
+
+            // Read out all input parameter values into variables
+            $body = $request->getContent();
+
+            // Deserialize the input values that needs it
+            $body = $this->deserialize($body, 'Swagger\Server\Model\Pet', $requestFormat);
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts = null;
+            $errors = $this->validate($body, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('body', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             // Set authentication method 'petstore_auth'
             $handler->setpetstore_auth($securitypetstore_auth);
@@ -108,31 +134,65 @@ class PetController extends Controller
             // Make the call to the business logic
             $responseCode = 204;
             $responseHeaders = [];
-            $result = $handler->addPet($body, $responseCode, $responseHeaders);
+            $response = $handler->addPet($body, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = '';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 405:
-                    $message = 'Invalid input';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'addPet');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'addPet');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'addPet');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'PetController::addPet']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'addPet');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'PetController::addPet']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'addPet');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'PetController::addPet']);
+            return $responseObject;
         }
     }
 
@@ -146,47 +206,75 @@ class PetController extends Controller
      */
     public function deletePetAction(Request $request, $petId)
     {
+        $this->logger->info($request, ['operation' => 'PetController::deletePet']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            400 => [
+                'message' => 'Invalid pet value',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
+        
+
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-        // Authentication 'petstore_auth' required
-        // Oauth required
-        $securitypetstore_auth = $request->headers->get('authorization');
-
-        // Read out all input parameter values into variables
-        $apiKey = $request->headers->get('api_key');
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $petId = $this->deserialize($petId, 'int', 'string');
-        $apiKey = $this->deserialize($apiKey, 'string', 'string');
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\Type("int");
-        $response = $this->validate($petId, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-        $asserts = [];
-        $asserts[] = new Assert\Type("string");
-        $response = $this->validate($apiKey, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+            // Authentication 'petstore_auth' required
+            // Oauth required
+            $securitypetstore_auth = $request->headers->get('authorization');
+
+            // Read out all input parameter values into variables
+            $apiKey = $request->headers->get('api_key');
+
+            // Deserialize the input values that needs it
+            $petId = $this->deserialize($petId, 'int', 'string');
+            $apiKey = $this->deserialize($apiKey, 'string', 'string');
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts[] = new Assert\Type("int");
+            $errors = $this->validate($petId, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('petId', $errors)
+                );
+            }
+            $asserts = [];
+            $asserts[] = new Assert\Type("string");
+            $errors = $this->validate($apiKey, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('api_key', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             // Set authentication method 'petstore_auth'
             $handler->setpetstore_auth($securitypetstore_auth);
@@ -194,31 +282,65 @@ class PetController extends Controller
             // Make the call to the business logic
             $responseCode = 204;
             $responseHeaders = [];
-            $result = $handler->deletePet($petId, $apiKey, $responseCode, $responseHeaders);
+            $response = $handler->deletePet($petId, $apiKey, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = '';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 400:
-                    $message = 'Invalid pet value';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'deletePet');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'deletePet');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'deletePet');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'PetController::deletePet']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'deletePet');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'PetController::deletePet']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'deletePet');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'PetController::deletePet']);
+            return $responseObject;
         }
     }
 
@@ -232,45 +354,74 @@ class PetController extends Controller
      */
     public function findPetsByStatusAction(Request $request)
     {
+        $this->logger->info($request, ['operation' => 'PetController::findPetsByStatus']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            200 => [
+                'message' => 'successful operation',
+                'responseType' => 'Swagger\Server\Model\Pet',
+            ],
+            400 => [
+                'message' => 'Invalid status value',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
+        
+
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-        // Authentication 'petstore_auth' required
-        // Oauth required
-        $securitypetstore_auth = $request->headers->get('authorization');
-
-        // Read out all input parameter values into variables
-        $status = $request->query->get('status');
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $status = $this->deserialize($status, 'array<csv,string>', 'string');
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\All([
-            new Assert\Choice([ "available", "pending", "sold" ])
-        ]);
-        $asserts[] = new Assert\All([
-            new Assert\Type("string")
-        ]);
-        $response = $this->validate($status, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+            // Authentication 'petstore_auth' required
+            // Oauth required
+            $securitypetstore_auth = $request->headers->get('authorization');
+
+            // Read out all input parameter values into variables
+            $status = $request->query->get('status');
+
+            // Deserialize the input values that needs it
+            $status = $this->deserialize($status, 'array<csv,string>', 'string');
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts[] = new Assert\All([
+                new Assert\Choice([ "available", "pending", "sold" ])
+            ]);
+            $asserts[] = new Assert\All([
+                new Assert\Type("string")
+            ]);
+            $errors = $this->validate($status, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('status', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             // Set authentication method 'petstore_auth'
             $handler->setpetstore_auth($securitypetstore_auth);
@@ -278,34 +429,65 @@ class PetController extends Controller
             // Make the call to the business logic
             $responseCode = 200;
             $responseHeaders = [];
-            $result = $handler->findPetsByStatus($status, $responseCode, $responseHeaders);
+            $response = $handler->findPetsByStatus($status, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = 'successful operation';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 200:
-                    $message = 'successful operation';
-                    break;
-                case 400:
-                    $message = 'Invalid status value';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'findPetsByStatus');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'findPetsByStatus');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'findPetsByStatus');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'PetController::findPetsByStatus']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'findPetsByStatus');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'PetController::findPetsByStatus']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'findPetsByStatus');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'PetController::findPetsByStatus']);
+            return $responseObject;
         }
     }
 
@@ -319,42 +501,71 @@ class PetController extends Controller
      */
     public function findPetsByTagsAction(Request $request)
     {
+        $this->logger->info($request, ['operation' => 'PetController::findPetsByTags']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            200 => [
+                'message' => 'successful operation',
+                'responseType' => 'Swagger\Server\Model\Pet',
+            ],
+            400 => [
+                'message' => 'Invalid tag value',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
+        
+
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-        // Authentication 'petstore_auth' required
-        // Oauth required
-        $securitypetstore_auth = $request->headers->get('authorization');
-
-        // Read out all input parameter values into variables
-        $tags = $request->query->get('tags');
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $tags = $this->deserialize($tags, 'array<csv,string>', 'string');
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\All([
-            new Assert\Type("string")
-        ]);
-        $response = $this->validate($tags, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+            // Authentication 'petstore_auth' required
+            // Oauth required
+            $securitypetstore_auth = $request->headers->get('authorization');
+
+            // Read out all input parameter values into variables
+            $tags = $request->query->get('tags');
+
+            // Deserialize the input values that needs it
+            $tags = $this->deserialize($tags, 'array<csv,string>', 'string');
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts[] = new Assert\All([
+                new Assert\Type("string")
+            ]);
+            $errors = $this->validate($tags, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('tags', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             // Set authentication method 'petstore_auth'
             $handler->setpetstore_auth($securitypetstore_auth);
@@ -362,34 +573,65 @@ class PetController extends Controller
             // Make the call to the business logic
             $responseCode = 200;
             $responseHeaders = [];
-            $result = $handler->findPetsByTags($tags, $responseCode, $responseHeaders);
+            $response = $handler->findPetsByTags($tags, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = 'successful operation';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 200:
-                    $message = 'successful operation';
-                    break;
-                case 400:
-                    $message = 'Invalid tag value';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'findPetsByTags');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'findPetsByTags');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'findPetsByTags');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'PetController::findPetsByTags']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'findPetsByTags');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'PetController::findPetsByTags']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'findPetsByTags');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'PetController::findPetsByTags']);
+            return $responseObject;
         }
     }
 
@@ -403,39 +645,72 @@ class PetController extends Controller
      */
     public function getPetByIdAction(Request $request, $petId)
     {
+        $this->logger->info($request, ['operation' => 'PetController::getPetById']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            200 => [
+                'message' => 'successful operation',
+                'responseType' => 'Swagger\Server\Model\Pet',
+            ],
+            400 => [
+                'message' => 'Invalid ID supplied',
+                'responseType' => '',
+            ],
+            404 => [
+                'message' => 'Pet not found',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
+        
+
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-        // Authentication 'api_key' required
-        // Set key with prefix in header
-        $securityapi_key = $request->headers->get('api_key');
-
-        // Read out all input parameter values into variables
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $petId = $this->deserialize($petId, 'int', 'string');
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\Type("int");
-        $response = $this->validate($petId, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+            // Authentication 'api_key' required
+            // Set key with prefix in header
+            $securityapi_key = $request->headers->get('api_key');
+
+            // Read out all input parameter values into variables
+
+            // Deserialize the input values that needs it
+            $petId = $this->deserialize($petId, 'int', 'string');
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts[] = new Assert\Type("int");
+            $errors = $this->validate($petId, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('petId', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             // Set authentication method 'api_key'
             $handler->setapi_key($securityapi_key);
@@ -443,37 +718,65 @@ class PetController extends Controller
             // Make the call to the business logic
             $responseCode = 200;
             $responseHeaders = [];
-            $result = $handler->getPetById($petId, $responseCode, $responseHeaders);
+            $response = $handler->getPetById($petId, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = 'successful operation';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 200:
-                    $message = 'successful operation';
-                    break;
-                case 400:
-                    $message = 'Invalid ID supplied';
-                    break;
-                case 404:
-                    $message = 'Pet not found';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'getPetById');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'getPetById');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'getPetById');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'PetController::getPetById']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'getPetById');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'PetController::getPetById']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'getPetById');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'PetController::getPetById']);
+            return $responseObject;
         }
     }
 
@@ -487,48 +790,81 @@ class PetController extends Controller
      */
     public function updatePetAction(Request $request)
     {
+        $this->logger->info($request, ['operation' => 'PetController::updatePet']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            400 => [
+                'message' => 'Invalid ID supplied',
+                'responseType' => '',
+            ],
+            404 => [
+                'message' => 'Pet not found',
+                'responseType' => '',
+            ],
+            405 => [
+                'message' => 'Validation exception',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
         // Make sure that the client is providing something that we can consume
-        $consumes = ['application/json', 'application/xml'];
-        $inputFormat = $request->headers->has('Content-Type')?$request->headers->get('Content-Type'):$consumes[0];
-        if (!in_array($inputFormat, $consumes)) {
-            // We can't consume the content that the client is sending us
-            return new Response('', 415);
-        }
+        $consumes = [
+            'application/json','application/xml',
+        ];
 
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-        // Authentication 'petstore_auth' required
-        // Oauth required
-        $securitypetstore_auth = $request->headers->get('authorization');
-
-        // Read out all input parameter values into variables
-        $body = $request->getContent();
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $body = $this->deserialize($body, 'Swagger\Server\Model\Pet', $inputFormat);
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\Type("Swagger\Server\Model\Pet");
-        $response = $this->validate($body, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            $contentType = $request->headers->has('Content-Type') ? $request->headers->get('Content-Type') : $consumes[0];
+            $requestFormat = $this->getOutputFormat($contentType, $consumes);
+            if ($requestFormat === null) {
+                // We can't consume the content that the client is sending us
+                throw new RequestFormatNotSupportedException();
+            }
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+            // Authentication 'petstore_auth' required
+            // Oauth required
+            $securitypetstore_auth = $request->headers->get('authorization');
+
+            // Read out all input parameter values into variables
+            $body = $request->getContent();
+
+            // Deserialize the input values that needs it
+            $body = $this->deserialize($body, 'Swagger\Server\Model\Pet', $requestFormat);
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts = null;
+            $errors = $this->validate($body, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('body', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             // Set authentication method 'petstore_auth'
             $handler->setpetstore_auth($securitypetstore_auth);
@@ -536,37 +872,65 @@ class PetController extends Controller
             // Make the call to the business logic
             $responseCode = 204;
             $responseHeaders = [];
-            $result = $handler->updatePet($body, $responseCode, $responseHeaders);
+            $response = $handler->updatePet($body, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = '';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 400:
-                    $message = 'Invalid ID supplied';
-                    break;
-                case 404:
-                    $message = 'Pet not found';
-                    break;
-                case 405:
-                    $message = 'Validation exception';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'updatePet');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'updatePet');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'updatePet');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'PetController::updatePet']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'updatePet');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'PetController::updatePet']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'updatePet');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'PetController::updatePet']);
+            return $responseObject;
         }
     }
 
@@ -580,55 +944,86 @@ class PetController extends Controller
      */
     public function updatePetWithFormAction(Request $request, $petId)
     {
+        $this->logger->info($request, ['operation' => 'PetController::updatePetWithForm']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            405 => [
+                'message' => 'Invalid input',
+                'responseType' => '',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
+        
+
         // Figure out what data format to return to the client
-        $produces = ['application/xml', 'application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-        // Authentication 'petstore_auth' required
-        // Oauth required
-        $securitypetstore_auth = $request->headers->get('authorization');
-
-        // Read out all input parameter values into variables
-        $name = $request->request->get('name');
-        $status = $request->request->get('status');
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $petId = $this->deserialize($petId, 'int', 'string');
-        $name = $this->deserialize($name, 'string', 'string');
-        $status = $this->deserialize($status, 'string', 'string');
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\Type("int");
-        $response = $this->validate($petId, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-        $asserts = [];
-        $asserts[] = new Assert\Type("string");
-        $response = $this->validate($name, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-        $asserts = [];
-        $asserts[] = new Assert\Type("string");
-        $response = $this->validate($status, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/xml','application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+            // Authentication 'petstore_auth' required
+            // Oauth required
+            $securitypetstore_auth = $request->headers->get('authorization');
+
+            // Read out all input parameter values into variables
+            $name = $request->request->get('');
+            $status = $request->request->get('');
+
+            // Deserialize the input values that needs it
+            $petId = $this->deserialize($petId, 'int', 'string');
+            $name = $this->deserialize($name, 'string', 'string');
+            $status = $this->deserialize($status, 'string', 'string');
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts[] = new Assert\Type("int");
+            $errors = $this->validate($petId, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('petId', $errors)
+                );
+            }
+            $asserts = [];
+            $asserts[] = new Assert\Type("string");
+            $errors = $this->validate($name, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('name', $errors)
+                );
+            }
+            $asserts = [];
+            $asserts[] = new Assert\Type("string");
+            $errors = $this->validate($status, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('status', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             // Set authentication method 'petstore_auth'
             $handler->setpetstore_auth($securitypetstore_auth);
@@ -636,31 +1031,65 @@ class PetController extends Controller
             // Make the call to the business logic
             $responseCode = 204;
             $responseHeaders = [];
-            $result = $handler->updatePetWithForm($petId, $name, $status, $responseCode, $responseHeaders);
+            $response = $handler->updatePetWithForm($petId, $name, $status, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = '';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 405:
-                    $message = 'Invalid input';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'updatePetWithForm');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'updatePetWithForm');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'updatePetWithForm');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'PetController::updatePetWithForm']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'updatePetWithForm');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'PetController::updatePetWithForm']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'updatePetWithForm');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'PetController::updatePetWithForm']);
+            return $responseObject;
         }
     }
 
@@ -674,54 +1103,85 @@ class PetController extends Controller
      */
     public function uploadFileAction(Request $request, $petId)
     {
+        $this->logger->info($request, ['operation' => 'PetController::uploadFile']);
+        // get the handler for the api first, we need it throughout the whole function
+        $handler = $this->getApiHandler();
+
+        // know response codes, models and messages
+        $responses = [
+
+            200 => [
+                'message' => 'successful operation',
+                'responseType' => 'Swagger\Server\Model\ApiResponse',
+            ],
+        ];
+
+        // set response and format to null, we need the variable even when not set
+        $response = null;
+        $responseFormat = null;
+
+        
+
         // Figure out what data format to return to the client
-        $produces = ['application/json'];
-        // Figure out what the client accepts
-        $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
-        $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
-        if ($responseFormat === null) {
-            return new Response('', 406);
-        }
-
-        // Handle authentication
-        // Authentication 'petstore_auth' required
-        // Oauth required
-        $securitypetstore_auth = $request->headers->get('authorization');
-
-        // Read out all input parameter values into variables
-        $additionalMetadata = $request->request->get('additionalMetadata');
-        $file = $request->files->get('file');
-
-        // Use the default value if no value was provided
-
-        // Deserialize the input values that needs it
-        $petId = $this->deserialize($petId, 'int', 'string');
-        $additionalMetadata = $this->deserialize($additionalMetadata, 'string', 'string');
-
-        // Validate the input values
-        $asserts = [];
-        $asserts[] = new Assert\NotNull();
-        $asserts[] = new Assert\Type("int");
-        $response = $this->validate($petId, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-        $asserts = [];
-        $asserts[] = new Assert\Type("string");
-        $response = $this->validate($additionalMetadata, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-        $asserts = [];
-        $asserts[] = new Assert\File();
-        $response = $this->validate($file, $asserts);
-        if ($response instanceof Response) {
-            return $response;
-        }
-
-
+        $produces = [
+            'application/json',
+        ];
         try {
-            $handler = $this->getApiHandler();
+            
+
+            // Figure out what the client accepts
+            $clientAccepts = $request->headers->has('Accept')?$request->headers->get('Accept'):'*/*';
+            $responseFormat = $this->getOutputFormat($clientAccepts, $produces);
+            if ($responseFormat === null) {
+                throw new ResponseFormatNotSupportedException();
+            }
+
+            // Handle authentication
+            // Authentication 'petstore_auth' required
+            // Oauth required
+            $securitypetstore_auth = $request->headers->get('authorization');
+
+            // Read out all input parameter values into variables
+            $additionalMetadata = $request->request->get('');
+            $file = $request->files->get('');
+
+            // Deserialize the input values that needs it
+            $petId = $this->deserialize($petId, 'int', 'string');
+            $additionalMetadata = $this->deserialize($additionalMetadata, 'string', 'string');
+
+            // Validate the input values
+            $validationMessages = [];
+            $asserts = [];
+            $asserts[] = new Assert\NotNull();
+            $asserts[] = new Assert\Type("int");
+            $errors = $this->validate($petId, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('petId', $errors)
+                );
+            }
+            $asserts = [];
+            $asserts[] = new Assert\Type("string");
+            $errors = $this->validate($additionalMetadata, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('additionalMetadata', $errors)
+                );
+            }
+            $asserts = [];
+            $asserts[] = new Assert\File();
+            $errors = $this->validate($file, $asserts);
+            if (count($errors) > 0) {
+                $validationMessages = array_merge(
+                    $validationMessages,
+                    $this->formatValidationMessages('file', $errors)
+                );
+            }
+            if (count($validationMessages) > 0) {
+                throw new ParametersNotValidException('Bad Request', 0, null, $validationMessages);
+            }
 
             // Set authentication method 'petstore_auth'
             $handler->setpetstore_auth($securitypetstore_auth);
@@ -729,31 +1189,65 @@ class PetController extends Controller
             // Make the call to the business logic
             $responseCode = 200;
             $responseHeaders = [];
-            $result = $handler->uploadFile($petId, $additionalMetadata, $file, $responseCode, $responseHeaders);
+            $response = $handler->uploadFile($petId, $additionalMetadata, $file, $responseCode, $responseHeaders);
 
-            // Find default response message
-            $message = 'successful operation';
+            // Set appropiate response type and message
+            $responseType = $responses[$responseCode]['responseType'];
 
-            // Find a more specific message, if available
-            switch ($responseCode) {
-                case 200:
-                    $message = 'successful operation';
-                    break;
+            // Assert that the output from business logic corresponds to response model
+            $asserts = [];
+            $asserts[] = new Assert\Type($responseType);
+            $errors = $this->validator->validate($response, $asserts);
+            if (count($errors) > 0) {
+                throw new ResponseNotValidException('Unexpected Error', 0, null, $errors);
+            }
+        } catch (ParametersNotValidException $exception) {
+            $responseCode = 400;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(400, $exception->getValidationErrors(), 'uploadFile');
+        } catch (ResponseFormatNotSupportedException $exception) {
+            $responseCode = 406;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(406, [$exception->getMessage()], 'uploadFile');
+        } catch (RequestFormatNotSupportedException $exception) {
+            $responseCode = 415;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(415, [$exception->getMessage()], 'uploadFile');
+        } catch (ResponseNotValidException $exception) {
+            $this->logger->error($exception, ['operation' => 'PetController::uploadFile']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, $exception->getValidationErrors(), 'uploadFile');
+        } catch (Exception $exception) {
+            $this->logger->error($exception, ['operation' => 'PetController::uploadFile']);
+            $responseCode = 500;
+            $responseHeaders = [];
+            $response = $handler->createErrorResponse(500, [$exception->getMessage()], 'uploadFile');
+        }
+        if ($responseFormat === null) {
+            $contentTypes = $this->sanitizeContentTypes($produces) ?: ['application/json'];
+            $responseFormat = reset($contentTypes);
+        }
+        $message = isset($responses[$responseCode]['message']) ? $responses[$responseCode]['message'] : '';
+        if ($response !== null) {
+            $serializedResponse = $response;
+            if ($responseFormat !== 'text/html') {
+                $serializedResponse = $this->serialize($response, $responseFormat);
             }
 
-            return new Response(
-                $result?$this->serialize($result, $responseFormat):'',
+            $responseObject = new Response(
+                $serializedResponse,
                 $responseCode,
                 array_merge(
                     $responseHeaders,
                     [
                         'Content-Type' => $responseFormat,
-                        'X-Swagger-Message' => $message
+                        'X-Swagger-Message' => $message,
                     ]
                 )
             );
-        } catch (Exception $fallthrough) {
-            return $this->createErrorResponse(new HttpException(500, 'An unsuspected error occurred.', $fallthrough));
+            $this->logger->info($responseObject, ['operation' => 'PetController::uploadFile']);
+            return $responseObject;
         }
     }
 

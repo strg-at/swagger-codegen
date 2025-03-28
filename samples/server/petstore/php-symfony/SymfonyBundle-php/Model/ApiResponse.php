@@ -71,7 +71,7 @@ class ApiResponse
      * Constructor
      * @param mixed[] $data Associated array of property values initializing the model
      */
-    public function __construct(array $data = null)
+    public function __construct(?array $data = null)
     {
         $this->code = isset($data['code']) ? $data['code'] : null;
         $this->type = isset($data['type']) ? $data['type'] : null;
@@ -95,7 +95,7 @@ class ApiResponse
      *
      * @return $this
      */
-    public function setCode($code = null)
+    public function setCode(int $code = null)
     {
         $this->code = $code;
 
@@ -119,7 +119,7 @@ class ApiResponse
      *
      * @return $this
      */
-    public function setType($type = null)
+    public function setType(string $type = null)
     {
         $this->type = $type;
 
@@ -143,7 +143,7 @@ class ApiResponse
      *
      * @return $this
      */
-    public function setMessage($message = null)
+    public function setMessage(string $message = null)
     {
         $this->message = $message;
 

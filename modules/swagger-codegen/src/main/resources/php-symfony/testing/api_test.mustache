@@ -38,28 +38,28 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
     /**
      * Setup before running any test cases
      */
-    public static function setUpBeforeClass()
+    public static function setUpBeforeClass(): void
     {
     }
 
     /**
      * Setup before running each test case
      */
-    public function setUp()
+    public function setUp(): void
     {
     }
 
     /**
      * Clean up after running each test case
      */
-    public function tearDown()
+    public function tearDown(): void
     {
     }
 
     /**
      * Clean up after running all test cases
      */
-    public static function tearDownAfterClass()
+    public static function tearDownAfterClass(): void
     {
     }
     {{#operation}}
@@ -70,7 +70,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
      * {{{summary}}}.
      *
      */
-    public function test{{operationIdCamelCase}}()
+    public function test{{operationIdCamelCase}}(): void
     {
         $client = static::createClient();
 
@@ -103,7 +103,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
     }
     {{/operation}}
 
-    protected function genTestData($regexp)
+    protected function genTestData($regexp): mixed
     {
         $grammar  = new \Hoa\File\Read('hoa://Library/Regex/Grammar.pp');
         $compiler = \Hoa\Compiler\Llk\Llk::load($grammar);

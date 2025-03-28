@@ -3,36 +3,36 @@
 namespace Swagger\Server\Service;
 
 use JMS\Serializer\SerializerBuilder;
-use JMS\Serializer\Naming\CamelCaseNamingStrategy;
-use JMS\Serializer\Naming\SerializedNameAnnotationStrategy;
-use JMS\Serializer\XmlDeserializationVisitor;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 class JmsSerializer implements SerializerInterface
 {
     protected $serializer;
 
-    public function __construct()
+    protected $deserializer;
+
+    public function __construct(ContainerInterface $container)
     {
-        $naming_strategy = new SerializedNameAnnotationStrategy(new CamelCaseNamingStrategy());
+        $this->deserializer = SerializerBuilder::create()
+            ->build();
+
         $this->serializer = SerializerBuilder::create()
-            ->setDeserializationVisitor('json', new StrictJsonDeserializationVisitor($naming_strategy))
-            ->setDeserializationVisitor('xml', new XmlDeserializationVisitor($naming_strategy))
             ->build();
     }
 
     public function serialize($data, $format)
     {
-        return SerializerBuilder::create()->build()->serialize($data, $this->convertFormat($format));
+        return $this->serializer->serialize($data, $this->convertFormat($format));
     }
 
     public function deserialize($data, $type, $format)
     {
         if ($format == 'string') {
-            return $this->deserializeString($data, $type);           
+            return $this->deserializeString($data, $type);
         }
 
         // If we end up here, let JMS serializer handle the deserialization
-        return $this->serializer->deserialize($data, $type, $this->convertFormat($format));
+        return $this->deserializer->deserialize($data, $type, $this->convertFormat($format));
     }
 
     private function convertFormat($format)

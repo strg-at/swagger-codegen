@@ -63,7 +63,7 @@ class Category
      * Constructor
      * @param mixed[] $data Associated array of property values initializing the model
      */
-    public function __construct(array $data = null)
+    public function __construct(?array $data = null)
     {
         $this->id = isset($data['id']) ? $data['id'] : null;
         $this->name = isset($data['name']) ? $data['name'] : null;
@@ -86,7 +86,7 @@ class Category
      *
      * @return $this
      */
-    public function setId($id = null)
+    public function setId(int $id = null)
     {
         $this->id = $id;
 
@@ -110,7 +110,7 @@ class Category
      *
      * @return $this
      */
-    public function setName($name = null)
+    public function setName(string $name = null)
     {
         $this->name = $name;
 

@@ -46,7 +46,7 @@ class StoreApi implements StoreApiInterface
     /**
      * Implementation of StoreApiInterface#deleteOrder
      */
-    public function deleteOrder($orderId)
+    public function deleteOrder(string $orderId)
     {
         // Implement the operation ...
     }
@@ -159,7 +159,7 @@ class StoreApi implements StoreApiInterface
     /**
      * Implementation of StoreApiInterface#getOrderById
      */
-    public function getOrderById($orderId)
+    public function getOrderById(int $orderId)
     {
         // Implement the operation ...
     }
