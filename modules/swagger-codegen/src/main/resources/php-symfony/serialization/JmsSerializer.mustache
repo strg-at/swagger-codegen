@@ -2,6 +2,8 @@
 
 namespace {{servicePackage}};
 
+use JMS\Serializer\Naming\IdenticalPropertyNamingStrategy;
+use JMS\Serializer\Naming\SerializedNameAnnotationStrategy;
 use JMS\Serializer\SerializerBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -14,10 +16,18 @@ class JmsSerializer implements SerializerInterface
     public function __construct(ContainerInterface $container)
     {
         $this->deserializer = SerializerBuilder::create()
-            ->build();
+        ->setPropertyNamingStrategy(
+            new SerializedNameAnnotationStrategy(
+                new IdenticalPropertyNamingStrategy()
+            )
+        )->build();
 
         $this->serializer = SerializerBuilder::create()
-            ->build();
+        ->setPropertyNamingStrategy(
+            new SerializedNameAnnotationStrategy(
+                new IdenticalPropertyNamingStrategy()
+            )
+        )->build();
     }
 
     public function serialize($data, $format)
@@ -101,7 +111,7 @@ class JmsSerializer implements SerializerInterface
             case 'pipes':
                 $data = explode('|', $data);
                 break;
-            default;
+            default:
                 $data = [];
         }
 
