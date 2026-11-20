@@ -17,7 +17,7 @@ class ParametersNotValidException extends Exception
      * @param Throwable|null $previous
      * @param $validationErrors
      */
-    public function __construct($message = '', $code = 0, Throwable $previous = null, $validationErrors = [])
+    public function __construct($message = '', $code = 0, ?Throwable $previous = null, $validationErrors = [])
     {
         parent::__construct($message, $code, $previous);
         $this->validationErrors = $validationErrors;
