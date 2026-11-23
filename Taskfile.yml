@@ -1,0 +1,29 @@
+---
+version: 3
+
+tasks:
+  swagger:build:
+    desc: Build the swagger-codegen-cli jar without running the tests.
+    summary: |
+      Runs `mvn -am -pl modules/swagger-codegen-cli clean package -DskipTests` through `run-in-docker.sh`, i.e. in the maven:3-jdk-8 container the generator
+      needs to build.
+
+      Creates modules/swagger-codegen-cli/target/swagger-codegen-cli.jar, which `php-symfony-petstore` uses. Only the cli
+      module and the modules it depends on are built, because swagger-generator (a war that downloads swagger-ui)
+      is not needed.
+    interactive: true
+    cmds:
+      - ./run-in-docker.sh mvn -am -pl modules/swagger-codegen-cli clean package -DskipTests
+
+  swagger:php-symfony-petstore:
+    desc: Build the generator if needed and regenerate the php-symfony petstore sample.
+    summary: |
+      Runs `bin/php-symfony-petstore.sh` through `run-in-docker.sh`, i.e. in the maven:3-jdk-8 container the generator
+      needs to build.
+
+      Builds modules/swagger-codegen-cli/target/swagger-codegen-cli.jar when it does not exist yet and recreates
+      samples/server/petstore/php-symfony with the templates from modules/swagger-codegen. Additional arguments are
+      passed on to the generator, e.g. `task swagger:php-symfony-petstore -- -DdebugModels`.
+    interactive: true
+    cmds:
+      - ./run-in-docker.sh ./bin/php-symfony-petstore.sh {{.CLI_ARGS}}
