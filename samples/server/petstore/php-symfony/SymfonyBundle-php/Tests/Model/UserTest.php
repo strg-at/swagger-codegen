@@ -29,6 +29,8 @@
 
 namespace Swagger\Server\Model;
 
+use PHPUnit\Framework\TestCase;
+
 /**
  * UserTest Class Doc Comment
  *
@@ -39,41 +41,41 @@ namespace Swagger\Server\Model;
  * @author      Swagger Codegen team
  * @link        https://github.com/swagger-api/swagger-codegen
  */
-class UserTest extends \PHPUnit_Framework_TestCase
+class UserTest extends TestCase
 {
 
     /**
      * Setup before running any test case
      */
-    public static function setUpBeforeClass()
+    public static function setUpBeforeClass(): void
     {
     }
 
     /**
      * Setup before running each test case
      */
-    public function setUp()
+    public function setUp(): void
     {
     }
 
     /**
      * Clean up after running each test case
      */
-    public function tearDown()
+    public function tearDown(): void
     {
     }
 
     /**
      * Clean up after running all test cases
      */
-    public static function tearDownAfterClass()
+    public static function tearDownAfterClass(): void
     {
     }
 
     /**
      * Test "User"
      */
-    public function testUser()
+    public function testUser(): void
     {
         $testUser = new User();
     }
@@ -81,56 +83,56 @@ class UserTest extends \PHPUnit_Framework_TestCase
     /**
      * Test attribute "id"
      */
-    public function testPropertyId()
+    public function testPropertyId(): void
     {
     }
 
     /**
      * Test attribute "username"
      */
-    public function testPropertyUsername()
+    public function testPropertyUsername(): void
     {
     }
 
     /**
      * Test attribute "firstName"
      */
-    public function testPropertyFirstName()
+    public function testPropertyFirstName(): void
     {
     }
 
     /**
      * Test attribute "lastName"
      */
-    public function testPropertyLastName()
+    public function testPropertyLastName(): void
     {
     }
 
     /**
      * Test attribute "email"
      */
-    public function testPropertyEmail()
+    public function testPropertyEmail(): void
     {
     }
 
     /**
      * Test attribute "password"
      */
-    public function testPropertyPassword()
+    public function testPropertyPassword(): void
     {
     }
 
     /**
      * Test attribute "phone"
      */
-    public function testPropertyPhone()
+    public function testPropertyPhone(): void
     {
     }
 
     /**
      * Test attribute "userStatus"
      */
-    public function testPropertyUserStatus()
+    public function testPropertyUserStatus(): void
     {
     }
 }

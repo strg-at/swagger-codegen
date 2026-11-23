@@ -29,6 +29,8 @@
 
 namespace Swagger\Server\Model;
 
+use PHPUnit\Framework\TestCase;
+
 /**
  * OrderTest Class Doc Comment
  *
@@ -39,41 +41,41 @@ namespace Swagger\Server\Model;
  * @author      Swagger Codegen team
  * @link        https://github.com/swagger-api/swagger-codegen
  */
-class OrderTest extends \PHPUnit_Framework_TestCase
+class OrderTest extends TestCase
 {
 
     /**
      * Setup before running any test case
      */
-    public static function setUpBeforeClass()
+    public static function setUpBeforeClass(): void
     {
     }
 
     /**
      * Setup before running each test case
      */
-    public function setUp()
+    public function setUp(): void
     {
     }
 
     /**
      * Clean up after running each test case
      */
-    public function tearDown()
+    public function tearDown(): void
     {
     }
 
     /**
      * Clean up after running all test cases
      */
-    public static function tearDownAfterClass()
+    public static function tearDownAfterClass(): void
     {
     }
 
     /**
      * Test "Order"
      */
-    public function testOrder()
+    public function testOrder(): void
     {
         $testOrder = new Order();
     }
@@ -81,42 +83,42 @@ class OrderTest extends \PHPUnit_Framework_TestCase
     /**
      * Test attribute "id"
      */
-    public function testPropertyId()
+    public function testPropertyId(): void
     {
     }
 
     /**
      * Test attribute "petId"
      */
-    public function testPropertyPetId()
+    public function testPropertyPetId(): void
     {
     }
 
     /**
      * Test attribute "quantity"
      */
-    public function testPropertyQuantity()
+    public function testPropertyQuantity(): void
     {
     }
 
     /**
      * Test attribute "shipDate"
      */
-    public function testPropertyShipDate()
+    public function testPropertyShipDate(): void
     {
     }
 
     /**
      * Test attribute "status"
      */
-    public function testPropertyStatus()
+    public function testPropertyStatus(): void
     {
     }
 
     /**
      * Test attribute "complete"
      */
-    public function testPropertyComplete()
+    public function testPropertyComplete(): void
     {
     }
 }

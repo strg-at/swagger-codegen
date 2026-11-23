@@ -88,7 +88,7 @@ interface PetApiInterface
      * @return 
      *
      */
-    public function deletePet(int $petId, string $apiKey = null, &$responseCode = 200, array &$responseHeaders = []);
+    public function deletePet(int $petId, ?string $apiKey = null, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation findPetsByStatus
@@ -160,7 +160,7 @@ interface PetApiInterface
      * @return 
      *
      */
-    public function updatePetWithForm(int $petId, string $name = null, string $status = null, &$responseCode = 200, array &$responseHeaders = []);
+    public function updatePetWithForm(int $petId, ?string $name = null, ?string $status = null, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * Operation uploadFile
@@ -176,7 +176,7 @@ interface PetApiInterface
      * @return \Swagger\Server\Model\ApiResponse
      *
      */
-    public function uploadFile(int $petId, string $additionalMetadata = null, UploadedFile $file = null, &$responseCode = 200, array &$responseHeaders = []);
+    public function uploadFile(int $petId, ?string $additionalMetadata = null, ?UploadedFile $file = null, &$responseCode = 200, array &$responseHeaders = []);
 
     /**
      * @param int $status The http status the error response reflects.

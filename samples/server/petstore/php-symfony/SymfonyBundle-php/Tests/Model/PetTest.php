@@ -29,6 +29,8 @@
 
 namespace Swagger\Server\Model;
 
+use PHPUnit\Framework\TestCase;
+
 /**
  * PetTest Class Doc Comment
  *
@@ -39,41 +41,41 @@ namespace Swagger\Server\Model;
  * @author      Swagger Codegen team
  * @link        https://github.com/swagger-api/swagger-codegen
  */
-class PetTest extends \PHPUnit_Framework_TestCase
+class PetTest extends TestCase
 {
 
     /**
      * Setup before running any test case
      */
-    public static function setUpBeforeClass()
+    public static function setUpBeforeClass(): void
     {
     }
 
     /**
      * Setup before running each test case
      */
-    public function setUp()
+    public function setUp(): void
     {
     }
 
     /**
      * Clean up after running each test case
      */
-    public function tearDown()
+    public function tearDown(): void
     {
     }
 
     /**
      * Clean up after running all test cases
      */
-    public static function tearDownAfterClass()
+    public static function tearDownAfterClass(): void
     {
     }
 
     /**
      * Test "Pet"
      */
-    public function testPet()
+    public function testPet(): void
     {
         $testPet = new Pet();
     }
@@ -81,42 +83,42 @@ class PetTest extends \PHPUnit_Framework_TestCase
     /**
      * Test attribute "id"
      */
-    public function testPropertyId()
+    public function testPropertyId(): void
     {
     }
 
     /**
      * Test attribute "category"
      */
-    public function testPropertyCategory()
+    public function testPropertyCategory(): void
     {
     }
 
     /**
      * Test attribute "name"
      */
-    public function testPropertyName()
+    public function testPropertyName(): void
     {
     }
 
     /**
      * Test attribute "photoUrls"
      */
-    public function testPropertyPhotoUrls()
+    public function testPropertyPhotoUrls(): void
     {
     }
 
     /**
      * Test attribute "tags"
      */
-    public function testPropertyTags()
+    public function testPropertyTags(): void
     {
     }
 
     /**
      * Test attribute "status"
      */
-    public function testPropertyStatus()
+    public function testPropertyStatus(): void
     {
     }
 }

@@ -29,6 +29,8 @@
 
 namespace Swagger\Server\Model;
 
+use PHPUnit\Framework\TestCase;
+
 /**
  * ApiResponseTest Class Doc Comment
  *
@@ -39,41 +41,41 @@ namespace Swagger\Server\Model;
  * @author      Swagger Codegen team
  * @link        https://github.com/swagger-api/swagger-codegen
  */
-class ApiResponseTest extends \PHPUnit_Framework_TestCase
+class ApiResponseTest extends TestCase
 {
 
     /**
      * Setup before running any test case
      */
-    public static function setUpBeforeClass()
+    public static function setUpBeforeClass(): void
     {
     }
 
     /**
      * Setup before running each test case
      */
-    public function setUp()
+    public function setUp(): void
     {
     }
 
     /**
      * Clean up after running each test case
      */
-    public function tearDown()
+    public function tearDown(): void
     {
     }
 
     /**
      * Clean up after running all test cases
      */
-    public static function tearDownAfterClass()
+    public static function tearDownAfterClass(): void
     {
     }
 
     /**
      * Test "ApiResponse"
      */
-    public function testApiResponse()
+    public function testApiResponse(): void
     {
         $testApiResponse = new ApiResponse();
     }
@@ -81,21 +83,21 @@ class ApiResponseTest extends \PHPUnit_Framework_TestCase
     /**
      * Test attribute "code"
      */
-    public function testPropertyCode()
+    public function testPropertyCode(): void
     {
     }
 
     /**
      * Test attribute "type"
      */
-    public function testPropertyType()
+    public function testPropertyType(): void
     {
     }
 
     /**
      * Test attribute "message"
      */
-    public function testPropertyMessage()
+    public function testPropertyMessage(): void
     {
     }
 }
