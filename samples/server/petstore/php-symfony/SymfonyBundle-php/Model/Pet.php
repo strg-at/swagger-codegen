@@ -131,7 +131,7 @@ class Pet
      *
      * @return $this
      */
-    public function setId(int $id = null)
+    public function setId(?int $id = null)
     {
         $this->id = $id;
 
@@ -227,7 +227,7 @@ class Pet
      *
      * @return $this
      */
-    public function setTags(array $tags = null)
+    public function setTags(?array $tags = null)
     {
         $this->tags = $tags;
 
@@ -251,7 +251,7 @@ class Pet
      *
      * @return $this
      */
-    public function setStatus(string $status = null)
+    public function setStatus(?string $status = null)
     {
         $this->status = $status;
 

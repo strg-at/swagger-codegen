@@ -43,7 +43,7 @@ use Swagger\Server\DependencyInjection\Compiler\SwaggerServerApiPass;
  */
 class SwaggerServerBundle extends Bundle
 {
-    public function build(ContainerBuilder $container)
+    public function build(ContainerBuilder $container): void
     {
         $container->addCompilerPass(new SwaggerServerApiPass());
     }

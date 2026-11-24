@@ -29,13 +29,10 @@
 
 namespace Swagger\Server\Controller;
 
-use Psr\Log\LoggerInterface;
-use Psr\Container\ContainerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Swagger\Server\Service\SerializerInterface;
-use Swagger\Server\Api\ApiServer;
-use Swagger\Server\Service\JmsSerializer;
-use Swagger\Server\Service\SymfonyValidator;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * Controller Class Doc Comment
@@ -52,18 +49,11 @@ class Controller extends AbstractController
     protected $apiServer;
     protected $logger;
 
-    public function __construct(
-        ContainerInterface $container,
-        LoggerInterface $logger,
-        JmsSerializer $serializer,
-        SymfonyValidator $validator,
-        ApiServer $apiServer
-    ) {
-        $this->setContainer($container); // ✅ Correct way to set the container
-        $this->logger = $logger;
-        $this->serializer = $serializer;
+
+    public function __construct(ValidatorInterface $validator, LoggerInterface $logger)
+    {
         $this->validator = $validator;
-        $this->apiServer = $apiServer;
+        $this->logger = $logger;
     }
 
     public function setSerializer(SerializerInterface $serializer)
@@ -127,7 +117,7 @@ class Controller extends AbstractController
      *
      * @param \Exception|null $exception
      *
-     * @return array|null
+     * @return array
      */
     private function exceptionToArray(?\Exception $exception = null)
     {

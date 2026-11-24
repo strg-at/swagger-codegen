@@ -29,6 +29,8 @@
 
 namespace Swagger\Server\Model;
 
+use PHPUnit\Framework\TestCase;
+
 /**
  * TagTest Class Doc Comment
  *
@@ -39,41 +41,41 @@ namespace Swagger\Server\Model;
  * @author      Swagger Codegen team
  * @link        https://github.com/swagger-api/swagger-codegen
  */
-class TagTest extends \PHPUnit_Framework_TestCase
+class TagTest extends TestCase
 {
 
     /**
      * Setup before running any test case
      */
-    public static function setUpBeforeClass()
+    public static function setUpBeforeClass(): void
     {
     }
 
     /**
      * Setup before running each test case
      */
-    public function setUp()
+    public function setUp(): void
     {
     }
 
     /**
      * Clean up after running each test case
      */
-    public function tearDown()
+    public function tearDown(): void
     {
     }
 
     /**
      * Clean up after running all test cases
      */
-    public static function tearDownAfterClass()
+    public static function tearDownAfterClass(): void
     {
     }
 
     /**
      * Test "Tag"
      */
-    public function testTag()
+    public function testTag(): void
     {
         $testTag = new Tag();
     }
@@ -81,14 +83,14 @@ class TagTest extends \PHPUnit_Framework_TestCase
     /**
      * Test attribute "id"
      */
-    public function testPropertyId()
+    public function testPropertyId(): void
     {
     }
 
     /**
      * Test attribute "name"
      */
-    public function testPropertyName()
+    public function testPropertyName(): void
     {
     }
 }
